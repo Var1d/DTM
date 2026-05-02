@@ -5,7 +5,7 @@ import '../utils/constants.dart';
 class StorageService {
   static Future<void> saveTokens(String access, String refresh) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(AppConstants.keyAccessToken,  access);
+    await prefs.setString(AppConstants.keyAccessToken, access);
     await prefs.setString(AppConstants.keyRefreshToken, refresh);
   }
 
@@ -19,6 +19,11 @@ class StorageService {
     return prefs.getString(AppConstants.keyRefreshToken);
   }
 
+  static Future<void> saveAccessToken(String access) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(AppConstants.keyAccessToken, access);
+  }
+
   static Future<void> saveUser(Map<String, dynamic> user) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(AppConstants.keyUser, jsonEncode(user));
@@ -29,6 +34,12 @@ class StorageService {
     final raw = prefs.getString(AppConstants.keyUser);
     if (raw == null) return null;
     return jsonDecode(raw);
+  }
+
+  static Future<bool> hasSavedSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(AppConstants.keyRefreshToken) != null &&
+        prefs.getString(AppConstants.keyUser) != null;
   }
 
   static Future<void> clear() async {

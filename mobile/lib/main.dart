@@ -57,8 +57,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   Future<void> _checkLogin() async {
-    final auth = context.read<AuthProvider>();
-    await auth.tryAutoLogin();
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) return;
     setState(() => _checking = false);
   }
 

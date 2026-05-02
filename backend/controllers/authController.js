@@ -53,8 +53,8 @@ const login = async (req, res, next) => {
     const accessToken   = generateAccessToken(payload);
     const refreshToken  = generateRefreshToken(payload);
 
-    // Simpan refresh token ke DB
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 hari
+    // Simpan refresh token sampai user logout.
+    const expiresAt = new Date('2038-01-01T00:00:00Z');
     await db.query(
       'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (?, ?, ?)',
       [user.id, refreshToken, expiresAt]

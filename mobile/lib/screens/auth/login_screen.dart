@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/biometric_service.dart';
+import '../../services/storage_service.dart';
 import '../../widgets/common/custom_button.dart';
 import '../../widgets/common/custom_textfield.dart';
 import '../tasks/home_screen.dart';
@@ -15,9 +16,9 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailCtrl    = TextEditingController();
+  final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  final _formKey      = GlobalKey<FormState>();
+  final _formKey = GlobalKey<FormState>();
   bool _biometricAvailable = false;
 
   @override
@@ -28,37 +29,43 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _checkBiometric() async {
     final available = await BiometricService.isAvailable();
-    setState(() => _biometricAvailable = available);
+    final hasSavedSession = await StorageService.hasSavedSession();
+    if (!mounted) return;
+    setState(() => _biometricAvailable = available && hasSavedSession);
   }
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
     final auth = context.read<AuthProvider>();
-    final ok   = await auth.login(_emailCtrl.text.trim(), _passwordCtrl.text);
+    final ok = await auth.login(_emailCtrl.text.trim(), _passwordCtrl.text);
     if (ok && mounted) {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+      Navigator.pushReplacement(
+          context, MaterialPageRoute(builder: (_) => const HomeScreen()));
     }
   }
 
   // Platform-specific: login pakai biometrik
   Future<void> _loginBiometric() async {
+    final auth = context.read<AuthProvider>();
     final ok = await BiometricService.authenticate();
     if (!ok) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Autentikasi biometrik gagal')),
-      );
+          const SnackBar(content: Text('Autentikasi biometrik gagal')),
+        );
       }
       return;
     }
     // Jika berhasil, langsung auto-login dengan token yang tersimpan
-    final auth = context.read<AuthProvider>();
     final logged = await auth.tryAutoLogin();
     if (logged && mounted) {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+      Navigator.pushReplacement(
+          context, MaterialPageRoute(builder: (_) => const HomeScreen()));
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Silakan login dengan email terlebih dahulu')),
+        const SnackBar(
+            content: Text(
+                'Sesi tersimpan tidak ditemukan. Silakan login dengan email.')),
       );
     }
   }
@@ -76,16 +83,25 @@ class _LoginScreenState extends State<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 60),
-                Text('Selamat Datang 👋', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text('Selamat Datang 👋',
+                    style: Theme.of(context)
+                        .textTheme
+                        .headlineMedium
+                        ?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                Text('Masuk ke akun Anda', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey)),
+                Text('Masuk ke akun Anda',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(color: Colors.grey)),
                 const SizedBox(height: 40),
                 CustomTextField(
                   label: 'Email',
                   controller: _emailCtrl,
                   keyboardType: TextInputType.emailAddress,
                   prefixIcon: const Icon(Icons.email_outlined),
-                  validator: (v) => v!.isEmpty ? 'Email tidak boleh kosong' : null,
+                  validator: (v) =>
+                      v!.isEmpty ? 'Email tidak boleh kosong' : null,
                 ),
                 const SizedBox(height: 16),
                 CustomTextField(
@@ -93,11 +109,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   controller: _passwordCtrl,
                   obscureText: true,
                   prefixIcon: const Icon(Icons.lock_outline),
-                  validator: (v) => v!.isEmpty ? 'Password tidak boleh kosong' : null,
+                  validator: (v) =>
+                      v!.isEmpty ? 'Password tidak boleh kosong' : null,
                 ),
                 if (auth.errorMessage != null) ...[
                   const SizedBox(height: 12),
-                  Text(auth.errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                  Text(auth.errorMessage!,
+                      style: const TextStyle(color: Colors.red, fontSize: 13)),
                 ],
                 const SizedBox(height: 24),
                 CustomButton(
@@ -115,7 +133,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: _loginBiometric,
                       icon: const Icon(Icons.fingerprint),
                       label: const Text('Masuk dengan Sidik Jari'),
-                      style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                      style: OutlinedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12))),
                     ),
                   ),
                 ],
@@ -123,8 +143,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                   const Text('Belum punya akun? '),
                   GestureDetector(
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen())),
-                    child: Text('Daftar', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+                    onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const RegisterScreen())),
+                    child: Text('Daftar',
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.bold)),
                   ),
                 ]),
               ],

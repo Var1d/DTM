@@ -7,9 +7,11 @@ const generateAccessToken = (payload) => {
 };
 
 const generateRefreshToken = (payload) => {
-  return jwt.sign(payload, process.env.REFRESH_TOKEN_SECRET, {
-    expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '7d',
-  });
+  const refreshExpiry = process.env.REFRESH_TOKEN_EXPIRES_IN || 'never';
+  if (refreshExpiry === 'never') {
+    return jwt.sign(payload, process.env.REFRESH_TOKEN_SECRET);
+  }
+  return jwt.sign(payload, process.env.REFRESH_TOKEN_SECRET, { expiresIn: refreshExpiry });
 };
 
 const verifyAccessToken = (token) => {
