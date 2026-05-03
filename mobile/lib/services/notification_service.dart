@@ -81,15 +81,22 @@ class NotificationService {
     String body,
     DateTime reminderAt,
   ) async {
+    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    final canScheduleExact =
+        await androidPlugin?.canScheduleExactNotifications() ?? false;
+
     try {
       await _schedule(
         notificationId,
         notificationTitle,
         body,
         reminderAt,
-        AndroidScheduleMode.exactAllowWhileIdle,
+        canScheduleExact
+            ? AndroidScheduleMode.exactAllowWhileIdle
+            : AndroidScheduleMode.inexactAllowWhileIdle,
       );
-    } on PlatformException {
+    } on PlatformException catch (_) {
       await _schedule(
         notificationId,
         notificationTitle,

@@ -106,11 +106,15 @@ class TaskProvider with ChangeNotifier {
       _applySearch();
       // Schedule notifikasi jika ada deadline.
       if (task.deadline != null) {
-        await NotificationService.scheduleTaskReminders(
-          taskId: task.id,
-          title: task.title,
-          deadline: task.deadline!,
-        );
+        try {
+          await NotificationService.scheduleTaskReminders(
+            taskId: task.id,
+            title: task.title,
+            deadline: task.deadline!,
+          );
+        } catch (e) {
+          debugPrint('Gagal menjadwalkan notifikasi task ${task.id}: $e');
+        }
       }
       return true;
     } catch (e) {
@@ -128,13 +132,21 @@ class TaskProvider with ChangeNotifier {
       if (idx != -1) _tasks[idx] = task;
       _applySearch();
       // Update notifikasi
-      await NotificationService.cancelReminder(id);
+      try {
+        await NotificationService.cancelReminder(id);
+      } catch (e) {
+        debugPrint('Gagal membatalkan notifikasi task $id: $e');
+      }
       if (task.deadline != null) {
-        await NotificationService.scheduleTaskReminders(
-          taskId: task.id,
-          title: task.title,
-          deadline: task.deadline!,
-        );
+        try {
+          await NotificationService.scheduleTaskReminders(
+            taskId: task.id,
+            title: task.title,
+            deadline: task.deadline!,
+          );
+        } catch (e) {
+          debugPrint('Gagal menjadwalkan notifikasi task ${task.id}: $e');
+        }
       }
       return true;
     } catch (e) {

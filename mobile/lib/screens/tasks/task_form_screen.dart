@@ -111,6 +111,19 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   @override
   Widget build(BuildContext context) {
     final courses = context.watch<CourseProvider>().courses;
+    final courseItems = <DropdownMenuItem<int?>>[
+      const DropdownMenuItem<int?>(
+        value: null,
+        child: Text('Tanpa Mata Kuliah'),
+      ),
+      ...courses.map(
+        (c) => DropdownMenuItem<int?>(
+          value: c.id,
+          child: Text(c.name, overflow: TextOverflow.ellipsis),
+        ),
+      ),
+    ];
+
     return Scaffold(
       appBar: AppBar(
           title: Text(
@@ -132,7 +145,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 controller: _descCtrl,
                 maxLines: 3),
             const SizedBox(height: 16),
-            DropdownButtonFormField<int>(
+            DropdownButtonFormField<int?>(
               initialValue: _courseId,
               hint: const Text('Pilih Mata Kuliah'),
               decoration: InputDecoration(
@@ -141,12 +154,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                     OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
               ),
-              items: [
-                const DropdownMenuItem(
-                    value: null, child: Text('Tanpa Mata Kuliah')),
-                ...courses.map(
-                    (c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
-              ],
+              isExpanded: true,
+              items: courseItems,
               onChanged: (v) => setState(() => _courseId = v),
             ),
             const SizedBox(height: 16),
