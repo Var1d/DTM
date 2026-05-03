@@ -34,6 +34,118 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     });
   }
 
+  Future<void> _showAddSubtaskSheet() async {
+    final titleCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    var difficulty = 'medium';
+    var submitting = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Tambah Sub-task',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: titleCtrl,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Judul Sub-task',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descCtrl,
+                minLines: 2,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Deskripsi (opsional)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: difficulty,
+                decoration: const InputDecoration(
+                  labelText: 'Tingkat Kesulitan',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'easy', child: Text('Mudah')),
+                  DropdownMenuItem(value: 'medium', child: Text('Sedang')),
+                  DropdownMenuItem(value: 'hard', child: Text('Sulit')),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setModalState(() => difficulty = value);
+                  }
+                },
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  icon: submitting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.add_task_rounded),
+                  label: const Text('Tambah Sub-task'),
+                  onPressed: submitting
+                      ? null
+                      : () async {
+                          final title = titleCtrl.text.trim();
+                          if (title.isEmpty) return;
+                          final navigator = Navigator.of(ctx);
+                          final taskProvider = context.read<TaskProvider>();
+                          setModalState(() => submitting = true);
+                          await ApiService.createTask({
+                            'title': title,
+                            'description': descCtrl.text.trim().isEmpty
+                                ? null
+                                : descCtrl.text.trim(),
+                            'parent_id': _task!.id,
+                            'course_id': _task!.courseId,
+                            'task_type': 'other',
+                            'difficulty': difficulty,
+                            'status': 'todo',
+                          });
+                          if (!mounted) return;
+                          navigator.pop();
+                          await _loadTask();
+                          if (mounted) {
+                            taskProvider.fetchTasks();
+                          }
+                        },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    titleCtrl.dispose();
+    descCtrl.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -131,8 +243,15 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                           children: [
                             Text('Sub-task',
                                 style: Theme.of(context).textTheme.titleSmall),
-                            Text('${t.progress ?? 0}%',
-                                style: const TextStyle(color: Colors.grey)),
+                            Row(mainAxisSize: MainAxisSize.min, children: [
+                              Text('${t.progress ?? 0}%',
+                                  style: const TextStyle(color: Colors.grey)),
+                              IconButton(
+                                icon: const Icon(Icons.add_task_rounded),
+                                tooltip: 'Tambah Sub-task',
+                                onPressed: _showAddSubtaskSheet,
+                              ),
+                            ]),
                           ]),
                       const SizedBox(height: 8),
                       LinearProgressIndicator(
@@ -150,6 +269,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                               _loadTask();
                             },
                           )),
+                    ],
+                    if (t.subTasks.isEmpty) ...[
+                      const SizedBox(height: 20),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.add_task_rounded),
+                        label: const Text('Tambah Sub-task'),
+                        onPressed: _showAddSubtaskSheet,
+                      ),
                     ],
                   ]),
             ),

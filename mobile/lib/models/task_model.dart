@@ -1,7 +1,6 @@
 class TaskModel {
   final int id;
   final int userId;
-  final int? categoryId;
   final int? courseId;
   final int? parentId;
   final String title;
@@ -18,8 +17,6 @@ class TaskModel {
   final DateTime? deadline;
   final DateTime? reminderAt;
   final int? progress; // 0-100, null jika tidak ada sub-task
-  final String? categoryName;
-  final String? categoryColor;
   final String? courseName;
   final String? courseColor;
   final String? lecturer;
@@ -29,7 +26,6 @@ class TaskModel {
   TaskModel({
     required this.id,
     required this.userId,
-    this.categoryId,
     this.courseId,
     this.parentId,
     required this.title,
@@ -45,8 +41,6 @@ class TaskModel {
     this.deadline,
     this.reminderAt,
     this.progress,
-    this.categoryName,
-    this.categoryColor,
     this.courseName,
     this.courseColor,
     this.lecturer,
@@ -57,7 +51,6 @@ class TaskModel {
   factory TaskModel.fromJson(Map<String, dynamic> json) => TaskModel(
         id: json['id'],
         userId: json['user_id'],
-        categoryId: json['category_id'],
         courseId: json['course_id'],
         parentId: json['parent_id'],
         title: json['title'],
@@ -79,8 +72,6 @@ class TaskModel {
             ? DateTime.parse(json['reminder_at']).toLocal()
             : null,
         progress: json['progress'],
-        categoryName: json['category_name'],
-        categoryColor: json['category_color'],
         courseName: json['course_name'],
         courseColor: json['course_color'],
         lecturer: json['lecturer'],

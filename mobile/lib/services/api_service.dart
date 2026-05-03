@@ -93,7 +93,6 @@ class ApiService {
   static Future<Map<String, dynamic>> getTasks({
     String? status,
     String? priority,
-    int? categoryId,
     int? courseId,
     String? date,
     String? search,
@@ -101,7 +100,6 @@ class ApiService {
     final params = <String, String>{};
     if (status != null) params['status'] = status;
     if (priority != null) params['priority'] = priority;
-    if (categoryId != null) params['category_id'] = categoryId.toString();
     if (courseId != null) params['course_id'] = courseId.toString();
     if (date != null) params['date'] = date;
     if (search != null) params['search'] = search;
@@ -159,46 +157,6 @@ class ApiService {
     final res = await _sendWithRefresh(
       (headers) =>
           http.delete(Uri.parse('$baseUrl/tasks/$id'), headers: headers),
-    );
-    _handle(res);
-  }
-
-  // ══ CATEGORIES ════════════════════════════════════════════════════════════
-  static Future<Map<String, dynamic>> getCategories() async {
-    final res = await _sendWithRefresh(
-      (headers) => http.get(Uri.parse('$baseUrl/categories'), headers: headers),
-    );
-    return _handle(res);
-  }
-
-  static Future<Map<String, dynamic>> createCategory(
-      String name, String color) async {
-    final res = await _sendWithRefresh(
-      (headers) => http.post(
-        Uri.parse('$baseUrl/categories'),
-        headers: headers,
-        body: jsonEncode({'name': name, 'color': color}),
-      ),
-    );
-    return _handle(res);
-  }
-
-  static Future<Map<String, dynamic>> updateCategory(
-      int id, String name, String color) async {
-    final res = await _sendWithRefresh(
-      (headers) => http.put(
-        Uri.parse('$baseUrl/categories/$id'),
-        headers: headers,
-        body: jsonEncode({'name': name, 'color': color}),
-      ),
-    );
-    return _handle(res);
-  }
-
-  static Future<void> deleteCategory(int id) async {
-    final res = await _sendWithRefresh(
-      (headers) =>
-          http.delete(Uri.parse('$baseUrl/categories/$id'), headers: headers),
     );
     _handle(res);
   }

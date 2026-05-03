@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, PointerSensor, closestCenter, useDroppable, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import PriorityBadge from '../../components/task/PriorityBadge';
@@ -64,8 +64,10 @@ function DraggableTaskCard({ task, onEdit, onDelete }) {
 }
 
 function KanbanColumn({ column, tasks, onEdit, onDelete }) {
+  const { setNodeRef, isOver } = useDroppable({ id: column.id });
+
   return (
-    <div style={{ flex: 1, minWidth: 280, background: '#f9fafb', borderRadius: 12, padding: 16 }}>
+    <div ref={setNodeRef} style={{ flex: 1, minWidth: 280, minHeight: 220, background: isOver ? '#eef2ff' : '#f9fafb', borderRadius: 12, padding: 16, border: isOver ? '1px solid #6366f1' : '1px solid transparent' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <div style={{ width: 10, height: 10, borderRadius: '50%', background: column.color }} />
         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>{column.label}</h3>
@@ -111,7 +113,8 @@ export default function BoardPage() {
 
   const handleDragEnd = ({ active, over }) => {
     if (!over || active.id === over.id) return;
-    const targetColumn = COLUMNS.find((column) => grouped[column.id].some((task) => task.id === over.id));
+    const targetColumn = COLUMNS.find((column) => column.id === over.id)
+      || COLUMNS.find((column) => grouped[column.id].some((task) => task.id === over.id));
     if (targetColumn) updateStatus(active.id, targetColumn.id);
   };
 

@@ -169,6 +169,21 @@ const create = async (req, res, next) => {
 
     if (!title) return error(res, 'Judul task akademik wajib diisi', 400);
 
+    const parsedGradeWeight =
+      grade_weight === undefined || grade_weight === null || grade_weight === '' ? 0 : Number(grade_weight);
+    if (!Number.isFinite(parsedGradeWeight) || parsedGradeWeight < 0 || parsedGradeWeight > 100) {
+      return error(res, 'Bobot nilai harus berupa angka 0-100', 400);
+    }
+
+    const parsedAchievedScore =
+      achieved_score === undefined || achieved_score === null || achieved_score === '' ? null : Number(achieved_score);
+    if (
+      parsedAchievedScore !== null &&
+      (!Number.isFinite(parsedAchievedScore) || parsedAchievedScore < 0 || parsedAchievedScore > 100)
+    ) {
+      return error(res, 'Nilai didapat harus berupa angka 0-100', 400);
+    }
+
     if (course_id) {
       const [course] = await db.query(
         'SELECT id FROM courses WHERE id = ? AND user_id = ?',
@@ -199,8 +214,8 @@ const create = async (req, res, next) => {
         task_type || 'assignment',
         status || 'todo',
         difficulty || 'medium',
-        grade_weight || 0,
-        achieved_score !== undefined ? achieved_score : null,
+        parsedGradeWeight,
+        parsedAchievedScore,
         deadline || null,
         reminder_at || null,
       ]
@@ -235,6 +250,25 @@ const update = async (req, res, next) => {
       achieved_score,
     } = req.body;
 
+    let parsedGradeWeight = current.grade_weight;
+    if (grade_weight !== undefined) {
+      parsedGradeWeight = grade_weight === null || grade_weight === '' ? 0 : Number(grade_weight);
+      if (!Number.isFinite(parsedGradeWeight) || parsedGradeWeight < 0 || parsedGradeWeight > 100) {
+        return error(res, 'Bobot nilai harus berupa angka 0-100', 400);
+      }
+    }
+
+    let parsedAchievedScore = current.achieved_score;
+    if (achieved_score !== undefined) {
+      parsedAchievedScore = achieved_score === null || achieved_score === '' ? null : Number(achieved_score);
+      if (
+        parsedAchievedScore !== null &&
+        (!Number.isFinite(parsedAchievedScore) || parsedAchievedScore < 0 || parsedAchievedScore > 100)
+      ) {
+        return error(res, 'Nilai didapat harus berupa angka 0-100', 400);
+      }
+    }
+
     await db.query(
       `UPDATE tasks
        SET title=?, description=?, course_id=?, status=?, deadline=?, reminder_at=?,
@@ -249,8 +283,8 @@ const update = async (req, res, next) => {
         reminder_at !== undefined ? reminder_at : current.reminder_at,
         task_type || current.task_type,
         difficulty || current.difficulty,
-        grade_weight !== undefined ? grade_weight : current.grade_weight,
-        achieved_score !== undefined ? achieved_score : current.achieved_score,
+        parsedGradeWeight,
+        parsedAchievedScore,
         req.params.id,
         req.user.id,
       ]
