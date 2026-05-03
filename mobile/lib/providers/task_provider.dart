@@ -17,8 +17,27 @@ class TaskProvider with ChangeNotifier {
 
   TaskState get state => _state;
   List<TaskModel> get tasks => _filtered;
+  List<TaskModel> get loadedTasks => _tasks;
   String? get errorMessage => _errorMessage;
   String? get filterStatus => _filterStatus;
+
+  int get totalCount => _tasks.length;
+  int get doneCount => _tasks.where((t) => t.status == 'done').length;
+  int get pendingCount => _tasks.where((t) => t.status != 'done').length;
+  int get overdueCount => _tasks.where((t) => t.isOverdue).length;
+  int get todayCount => _tasks.where((t) {
+        final deadline = t.deadline;
+        if (deadline == null) return false;
+        final now = DateTime.now();
+        return deadline.year == now.year &&
+            deadline.month == now.month &&
+            deadline.day == now.day;
+      }).length;
+
+  double get completionRate {
+    if (_tasks.isEmpty) return 0;
+    return doneCount / _tasks.length;
+  }
 
   void _setState(TaskState s, {String? err}) {
     _state = s;
