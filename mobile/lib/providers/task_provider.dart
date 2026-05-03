@@ -13,18 +13,22 @@ class TaskProvider with ChangeNotifier {
   String _searchQuery = '';
   String? _filterStatus;
   String? _filterPriority;
-  int? _filterCategoryId;
+  int? _filterCourseId;
 
   TaskState get state => _state;
   List<TaskModel> get tasks => _filtered;
   List<TaskModel> get loadedTasks => _tasks;
   String? get errorMessage => _errorMessage;
   String? get filterStatus => _filterStatus;
+  int? get filterCourseId => _filterCourseId;
 
   int get totalCount => _tasks.length;
   int get doneCount => _tasks.where((t) => t.status == 'done').length;
   int get pendingCount => _tasks.where((t) => t.status != 'done').length;
   int get overdueCount => _tasks.where((t) => t.isOverdue).length;
+  int get criticalCount => _tasks
+      .where((t) => t.priority == 'critical' || t.priority == 'high')
+      .length;
   int get todayCount => _tasks.where((t) {
         final deadline = t.deadline;
         if (deadline == null) return false;
@@ -52,7 +56,7 @@ class TaskProvider with ChangeNotifier {
       final res = await ApiService.getTasks(
         status: _filterStatus,
         priority: _filterPriority,
-        categoryId: _filterCategoryId,
+        courseId: _filterCourseId,
         date: date,
       );
       _tasks = (res['data'] as List).map((e) => TaskModel.fromJson(e)).toList();
@@ -84,10 +88,10 @@ class TaskProvider with ChangeNotifier {
   }
 
   // ── Filter ────────────────────────────────────────────────────────────────
-  void setFilter({String? status, String? priority, int? categoryId}) {
+  void setFilter({String? status, String? priority, int? courseId}) {
     _filterStatus = status;
     _filterPriority = priority;
-    _filterCategoryId = categoryId;
+    _filterCourseId = courseId;
     fetchTasks();
   }
 

@@ -94,6 +94,7 @@ class ApiService {
     String? status,
     String? priority,
     int? categoryId,
+    int? courseId,
     String? date,
     String? search,
   }) async {
@@ -101,6 +102,7 @@ class ApiService {
     if (status != null) params['status'] = status;
     if (priority != null) params['priority'] = priority;
     if (categoryId != null) params['category_id'] = categoryId.toString();
+    if (courseId != null) params['course_id'] = courseId.toString();
     if (date != null) params['date'] = date;
     if (search != null) params['search'] = search;
 
@@ -197,6 +199,46 @@ class ApiService {
     final res = await _sendWithRefresh(
       (headers) =>
           http.delete(Uri.parse('$baseUrl/categories/$id'), headers: headers),
+    );
+    _handle(res);
+  }
+
+  // COURSES
+  static Future<Map<String, dynamic>> getCourses() async {
+    final res = await _sendWithRefresh(
+      (headers) => http.get(Uri.parse('$baseUrl/courses'), headers: headers),
+    );
+    return _handle(res);
+  }
+
+  static Future<Map<String, dynamic>> createCourse(
+      Map<String, dynamic> data) async {
+    final res = await _sendWithRefresh(
+      (headers) => http.post(
+        Uri.parse('$baseUrl/courses'),
+        headers: headers,
+        body: jsonEncode(data),
+      ),
+    );
+    return _handle(res);
+  }
+
+  static Future<Map<String, dynamic>> updateCourse(
+      int id, Map<String, dynamic> data) async {
+    final res = await _sendWithRefresh(
+      (headers) => http.put(
+        Uri.parse('$baseUrl/courses/$id'),
+        headers: headers,
+        body: jsonEncode(data),
+      ),
+    );
+    return _handle(res);
+  }
+
+  static Future<void> deleteCourse(int id) async {
+    final res = await _sendWithRefresh(
+      (headers) =>
+          http.delete(Uri.parse('$baseUrl/courses/$id'), headers: headers),
     );
     _handle(res);
   }

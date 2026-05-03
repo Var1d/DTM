@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/category_provider.dart';
+import '../../providers/course_provider.dart';
 import '../../widgets/task/task_card.dart';
-import '../categories/category_screen.dart';
+import '../courses/course_screen.dart';
 import '../profile/profile_screen.dart';
 import 'task_form_screen.dart';
 import 'task_detail_screen.dart';
@@ -26,7 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TaskProvider>().fetchTasks();
-      context.read<CategoryProvider>().fetchCategories();
+      context.read<CourseProvider>().fetchCourses();
     });
   }
 
@@ -73,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
-                    'Dashboard Produktivitas',
+                    'Dashboard Akademik',
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                   ),
                 ),
@@ -125,9 +125,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 Expanded(
                   child: _DashboardMetric(
-                    icon: Icons.warning_amber_rounded,
-                    label: 'Lewat',
-                    value: '${prov.overdueCount}',
+                    icon: Icons.priority_high_rounded,
+                    label: 'Kritis',
+                    value: '${prov.criticalCount}',
                     color: Colors.red,
                   ),
                 ),
@@ -180,14 +180,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final task = context.watch<TaskProvider>();
+    final courses = context.watch<CourseProvider>().courses;
     return Scaffold(
       appBar: AppBar(
         title: Text('Halo, ${auth.user?.name.split(' ').first ?? ''} 👋'),
         actions: [
           IconButton(
-              icon: const Icon(Icons.category_outlined),
+              icon: const Icon(Icons.school_outlined),
               onPressed: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const CategoryScreen()))),
+                  MaterialPageRoute(builder: (_) => const CourseScreen()))),
           IconButton(
               icon: const Icon(Icons.person_outline),
               onPressed: () => Navigator.push(context,
@@ -196,6 +197,29 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(children: [
         _buildProductivityDashboard(task),
+        if (courses.isNotEmpty)
+          SizedBox(
+            height: 70,
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+              scrollDirection: Axis.horizontal,
+              itemBuilder: (_, i) {
+                final course = courses[i];
+                final selected = task.filterCourseId == course.id;
+                return ChoiceChip(
+                  label: Text(course.name),
+                  selected: selected,
+                  avatar: const Icon(Icons.menu_book_rounded, size: 16),
+                  onSelected: (_) => task.setFilter(
+                    courseId: selected ? null : course.id,
+                    status: task.filterStatus,
+                  ),
+                );
+              },
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemCount: courses.length,
+            ),
+          ),
         // Search bar
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -242,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
           task.fetchTasks();
         },
         icon: const Icon(Icons.add),
-        label: const Text('Tambah Task'),
+        label: const Text('Tambah Tugas'),
       ),
     );
   }

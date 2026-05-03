@@ -10,21 +10,28 @@ class PriorityBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color:        cfg.$1.withOpacity(0.15),
+        color: cfg.$1.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border:       Border.all(color: cfg.$1.withOpacity(0.4)),
+        border: Border.all(color: cfg.$1.withValues(alpha: 0.4)),
       ),
-      child: Text(cfg.$2, style: TextStyle(fontSize: 11, color: cfg.$1, fontWeight: FontWeight.w600)),
+      child: Text(
+        cfg.$2,
+        style: TextStyle(
+          fontSize: 11,
+          color: cfg.$1,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 
-  // (color, label)
   static (Color, String) _config(String? p) => switch (p) {
-    'overdue'  => (Colors.red,         '🔴 Terlambat'),
-    'critical' => (Colors.deepOrange,  '🔥 Kritis'),
-    'high'     => (Colors.orange,      '⚠️ Tinggi'),
-    'medium'   => (Colors.amber,       '🟡 Sedang'),
-    'low'      => (Colors.green,       '🟢 Rendah'),
-    _          => (Colors.grey,        '⬜ Tanpa Deadline'),
-  };
+        'overdue' => (Colors.red, 'Terlambat'),
+        'critical' => (Colors.deepOrange, 'Kritis'),
+        'high' => (Colors.orange, 'Tinggi'),
+        'medium' => (Colors.amber, 'Sedang'),
+        'low' => (Colors.green, 'Aman'),
+        'done' => (Colors.blueGrey, 'Selesai'),
+        _ => (Colors.grey, 'Tanpa Deadline'),
+      };
 }

@@ -4,7 +4,7 @@ const cors    = require('cors');
 
 const authRoutes     = require('./routes/authRoutes');
 const taskRoutes     = require('./routes/taskRoutes');
-const categoryRoutes = require('./routes/categoryRoutes');
+const courseRoutes   = require('./routes/courseRoutes');
 const userRoutes     = require('./routes/userRoutes');
 const errorMiddleware = require('./middlewares/errorMiddleware');
 
@@ -18,12 +18,12 @@ app.use(express.json());
 // Routes
 app.use('/api/auth',       authRoutes);
 app.use('/api/tasks',      taskRoutes);
-app.use('/api/categories', categoryRoutes);
+app.use('/api/courses',    courseRoutes);
 app.use('/api/user',       userRoutes);
 
 // Health check
 app.get('/', (req, res) => {
-  res.json({ message: 'Daily Task Manager API is running!' });
+  res.json({ message: 'Academic Task Manager API is running!' });
 });
 
 // Error handler (harus paling bawah)

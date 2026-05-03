@@ -20,13 +20,14 @@ const register = async (req, res, next) => {
       [name, email, hashed]
     );
 
-    // Insert kategori default mahasiswa
+    // Insert mata kuliah default agar user baru langsung punya konteks akademik.
     const newId = result.insertId;
     await db.query(
-      `INSERT INTO categories (user_id, name, color) VALUES
-       (?, "Kuliah", "#6366f1"), (?, "Tugas", "#f59e0b"),
-       (?, "Ujian", "#ef4444"), (?, "Organisasi", "#22c55e")`,
-      [newId, newId, newId, newId]
+      `INSERT INTO courses (user_id, name, lecturer, room, day, start_time, end_time, credit, color) VALUES
+       (?, "Pengembangan Aplikasi Berbasis Platform", NULL, NULL, "Senin", "08:00:00", "09:40:00", 3, "#6366f1"),
+       (?, "Basis Data", NULL, NULL, "Rabu", "10:00:00", "11:40:00", 3, "#14b8a6"),
+       (?, "Statistika", NULL, NULL, "Jumat", "13:00:00", "14:40:00", 2, "#f59e0b")`,
+      [newId, newId, newId]
     );
 
     return success(res, { id: newId, name, email }, "Registrasi berhasil", 201);

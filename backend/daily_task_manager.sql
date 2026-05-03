@@ -1,8 +1,8 @@
 -- ============================================
--- DATABASE: Daily Task Manager
+-- DATABASE: Academic Task Manager
 -- Platform: MySQL
 -- Project : Tugas Besar - Pengembangan Aplikasi Berbasis Platform
--- Versi 2  : Priority dihitung dinamis dari deadline (tidak disimpan di DB)
+-- Fokus   : Produktivitas akademik mahasiswa
 -- ============================================
 
 CREATE DATABASE IF NOT EXISTS daily_task_manager
@@ -11,9 +11,6 @@ CREATE DATABASE IF NOT EXISTS daily_task_manager
 
 USE daily_task_manager;
 
--- ============================================
--- TABEL: users
--- ============================================
 CREATE TABLE users (
   id          INT PRIMARY KEY AUTO_INCREMENT,
   name        VARCHAR(100)  NOT NULL,
@@ -24,9 +21,6 @@ CREATE TABLE users (
   updated_at  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- ============================================
--- TABEL: refresh_tokens
--- ============================================
 CREATE TABLE refresh_tokens (
   id          INT PRIMARY KEY AUTO_INCREMENT,
   user_id     INT           NOT NULL,
@@ -39,49 +33,49 @@ CREATE TABLE refresh_tokens (
     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- ============================================
--- TABEL: categories
--- ============================================
-CREATE TABLE categories (
+CREATE TABLE courses (
   id          INT PRIMARY KEY AUTO_INCREMENT,
   user_id     INT           NOT NULL,
-  name        VARCHAR(100)  NOT NULL,
+  name        VARCHAR(120)  NOT NULL,
+  lecturer    VARCHAR(120)  DEFAULT NULL,
+  room        VARCHAR(80)   DEFAULT NULL,
+  day         ENUM('Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu') DEFAULT NULL,
+  start_time  TIME          DEFAULT NULL,
+  end_time    TIME          DEFAULT NULL,
+  credit      INT           DEFAULT 3,
   color       VARCHAR(7)    DEFAULT '#6366f1',
   created_at  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
   updated_at  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-  CONSTRAINT fk_cat_user
+  CONSTRAINT fk_course_user
     FOREIGN KEY (user_id) REFERENCES users(id)
     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- ============================================
--- TABEL: tasks
--- Catatan: kolom 'priority' DIHAPUS karena dihitung
---          secara dinamis di backend berdasarkan deadline.
---          Kolom 'reminder_at' juga dihitung otomatis
---          dari deadline jika tidak diisi manual.
--- ============================================
 CREATE TABLE tasks (
-  id            INT PRIMARY KEY AUTO_INCREMENT,
-  user_id       INT           NOT NULL,
-  category_id   INT           DEFAULT NULL,
-  parent_id     INT           DEFAULT NULL,
-  title         VARCHAR(255)  NOT NULL,
-  description   TEXT          DEFAULT NULL,
-  status        ENUM('todo', 'in_progress', 'done') DEFAULT 'todo',
-  deadline      DATETIME      DEFAULT NULL,
-  reminder_at   DATETIME      DEFAULT NULL,
-  is_deleted    TINYINT(1)    DEFAULT 0,
-  created_at    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
-  updated_at    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  id              INT PRIMARY KEY AUTO_INCREMENT,
+  user_id         INT           NOT NULL,
+  course_id       INT           DEFAULT NULL,
+  parent_id       INT           DEFAULT NULL,
+  title           VARCHAR(255)  NOT NULL,
+  description     TEXT          DEFAULT NULL,
+  task_type       ENUM('assignment','quiz','mid_exam','final_exam','practicum','presentation','project','reading','other') DEFAULT 'assignment',
+  status          ENUM('todo', 'in_progress', 'done') DEFAULT 'todo',
+  difficulty      ENUM('easy','medium','hard') DEFAULT 'medium',
+  grade_weight    DECIMAL(5,2)  DEFAULT 0.00,
+  achieved_score  DECIMAL(5,2)  DEFAULT NULL,
+  deadline        DATETIME      DEFAULT NULL,
+  reminder_at     DATETIME      DEFAULT NULL,
+  is_deleted      TINYINT(1)    DEFAULT 0,
+  created_at      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
   CONSTRAINT fk_task_user
     FOREIGN KEY (user_id) REFERENCES users(id)
     ON DELETE CASCADE,
 
-  CONSTRAINT fk_task_category
-    FOREIGN KEY (category_id) REFERENCES categories(id)
+  CONSTRAINT fk_task_course
+    FOREIGN KEY (course_id) REFERENCES courses(id)
     ON DELETE SET NULL,
 
   CONSTRAINT fk_task_parent
@@ -89,49 +83,32 @@ CREATE TABLE tasks (
     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- ============================================
--- INDEX (untuk performa query)
--- ============================================
-CREATE INDEX idx_tasks_user_id      ON tasks(user_id);
-CREATE INDEX idx_tasks_category_id  ON tasks(category_id);
-CREATE INDEX idx_tasks_parent_id    ON tasks(parent_id);
-CREATE INDEX idx_tasks_status       ON tasks(status);
-CREATE INDEX idx_tasks_deadline     ON tasks(deadline);
-CREATE INDEX idx_tasks_is_deleted   ON tasks(is_deleted);
-CREATE INDEX idx_categories_user_id ON categories(user_id);
-CREATE INDEX idx_rt_user_id         ON refresh_tokens(user_id);
+CREATE INDEX idx_courses_user_id ON courses(user_id);
+CREATE INDEX idx_tasks_user_id   ON tasks(user_id);
+CREATE INDEX idx_tasks_course_id ON tasks(course_id);
+CREATE INDEX idx_tasks_parent_id ON tasks(parent_id);
+CREATE INDEX idx_tasks_status    ON tasks(status);
+CREATE INDEX idx_tasks_deadline  ON tasks(deadline);
+CREATE INDEX idx_tasks_deleted   ON tasks(is_deleted);
+CREATE INDEX idx_rt_user_id      ON refresh_tokens(user_id);
 
--- ============================================
--- DATA DUMMY (opsional, untuk testing)
--- ============================================
-
--- User dummy (password: "rahasia123" di-hash dengan bcrypt)
+-- User dummy. Password dummy ini hanya contoh struktur.
 INSERT INTO users (name, email, password) VALUES
-('Rrr',   'rrr@email.com',   '$2b$10$examplehashedpassword1234567890abcdef'),
 ('Farid', 'farid@email.com', '$2b$10$examplehashedpassword0987654321fedcba');
 
--- Kategori default mahasiswa untuk user id=1 (otomatis dibuat saat register)
-INSERT INTO categories (user_id, name, color) VALUES
-(1, 'Kuliah',     '#6366f1'),
-(1, 'Tugas',      '#f59e0b'),
-(1, 'Ujian',      '#ef4444'),
-(1, 'Organisasi', '#22c55e');
+INSERT INTO courses (user_id, name, lecturer, room, day, start_time, end_time, credit, color) VALUES
+(1, 'Pengembangan Aplikasi Berbasis Platform', 'Dosen PABP', 'Lab Komputer', 'Senin', '08:00:00', '09:40:00', 3, '#6366f1'),
+(1, 'Basis Data', 'Dosen Basis Data', 'Ruang 204', 'Rabu', '10:00:00', '11:40:00', 3, '#14b8a6'),
+(1, 'Statistika', 'Dosen Statistika', 'Ruang 301', 'Jumat', '13:00:00', '14:40:00', 2, '#f59e0b');
 
--- Task utama dummy (tanpa kolom priority)
-INSERT INTO tasks (user_id, category_id, parent_id, title, description, status, deadline, reminder_at) VALUES
-(1, 1, NULL, 'Buat laporan praktikum',   'Laporan jaringan komputer pertemuan 5',       'in_progress', '2026-05-10 23:59:00', NULL),
-(1, 2, NULL, 'Kerjakan tugas besar PABP','Aplikasi multiplatform Daily Task Manager',   'todo',        '2026-06-30 23:59:00', NULL),
-(1, 1, NULL, 'Belajar untuk UTS',        'Materi Data Mining dan Jaringan Komputer',    'todo',        '2026-05-05 08:00:00', NULL);
+INSERT INTO tasks
+(user_id, course_id, parent_id, title, description, task_type, status, difficulty, grade_weight, achieved_score, deadline, reminder_at)
+VALUES
+(1, 1, NULL, 'UAS aplikasi Academic Task Manager', 'Finalisasi mobile dan backend untuk UAS PABP', 'final_exam', 'in_progress', 'hard', 40.00, NULL, '2026-06-30 23:59:00', NULL),
+(1, 2, NULL, 'Laporan normalisasi database', 'Normalisasi dan ERD sistem akademik', 'assignment', 'todo', 'medium', 15.00, NULL, '2026-05-10 23:59:00', NULL),
+(1, 3, NULL, 'Kuis probabilitas', 'Latihan distribusi peluang', 'quiz', 'todo', 'medium', 10.00, NULL, '2026-05-05 08:00:00', NULL);
 
--- Sub-task dari task id=1 (Laporan praktikum)
-INSERT INTO tasks (user_id, category_id, parent_id, title, status) VALUES
-(1, 1, 1, 'Foto dokumentasi praktikum', 'done'),
-(1, 1, 1, 'Tulis pembahasan',           'todo'),
-(1, 1, 1, 'Buat kesimpulan',            'todo');
-
--- Sub-task dari task id=2 (Tugas Besar)
-INSERT INTO tasks (user_id, category_id, parent_id, title, status) VALUES
-(1, 2, 2, 'Setup repository Git',    'done'),
-(1, 2, 2, 'Buat backend Node.js',    'in_progress'),
-(1, 2, 2, 'Buat Flutter mobile app', 'todo'),
-(1, 2, 2, 'Buat web client React',   'todo');
+INSERT INTO tasks (user_id, course_id, parent_id, title, task_type, status, difficulty) VALUES
+(1, 1, 1, 'Rancang schema akademik', 'project', 'done', 'medium'),
+(1, 1, 1, 'Implementasi smart priority', 'project', 'in_progress', 'hard'),
+(1, 1, 1, 'Testing aplikasi mobile', 'project', 'todo', 'medium');
