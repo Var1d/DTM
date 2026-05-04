@@ -13,12 +13,14 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   async (err) => {
-    if (err.response?.status === 401) {
+    if (err.response?.status === 401 && !err.config?._retry) {
       const refresh = localStorage.getItem('refresh_token');
       if (refresh) {
         try {
+          err.config._retry = true;
           const { data } = await axios.post(`${BASE_URL}/auth/refresh`, { refresh_token: refresh });
           localStorage.setItem('access_token', data.data.access_token);
+          err.config.headers = err.config.headers || {};
           err.config.headers.Authorization = `Bearer ${data.data.access_token}`;
           return api(err.config);
         } catch {

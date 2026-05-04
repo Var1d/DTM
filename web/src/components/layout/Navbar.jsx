@@ -1,25 +1,59 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import Avatar from '../common/Avatar';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
+  const closeMenu = () => setMenuOpen(false);
+
   return (
-    <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 24px', background: '#6366f1', color: '#fff', position: 'sticky', top: 0, zIndex: 100 }}>
-      <Link to="/" style={{ color: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: 18 }}>
-        Academic Task Manager
-      </Link>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-        <Link to="/" style={{ color: '#e0e7ff', textDecoration: 'none', fontSize: 14 }}>Board</Link>
-        <Link to="/courses" style={{ color: '#e0e7ff', textDecoration: 'none', fontSize: 14 }}>Mata Kuliah</Link>
-        <Link to="/profile" style={{ color: '#e0e7ff', textDecoration: 'none', fontSize: 14 }}>{user?.name?.split(' ')[0]}</Link>
-        <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>Keluar</button>
+    <nav className="navbar">
+      <NavLink to="/" className="brand" onClick={closeMenu}>
+        <img src={isDark ? '/pio-logo.png' : '/pio-logo-light.png'} alt="PIO Logo" className="brand-logo" />
+      </NavLink>
+
+      <button
+        type="button"
+        className="menu-toggle"
+        aria-label="Toggle navigation"
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen((prev) => !prev)}
+      >
+        <span />
+        <span />
+        <span />
+      </button>
+
+      <div className={`nav-links ${menuOpen ? 'open' : ''}`}>
+        <NavLink to="/" end onClick={closeMenu} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>Board</NavLink>
+        <NavLink to="/courses" onClick={closeMenu} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>Mata Kuliah</NavLink>
+        <NavLink to="/profile" onClick={closeMenu} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <Avatar user={user} size={26} />
+          <span>{user?.name?.split(' ')[0] || 'Profil'}</span>
+        </NavLink>
+        <button
+          onClick={toggleTheme}
+          className="btn btn-ghost theme-toggle"
+          type="button"
+          aria-label={isDark ? 'Aktifkan mode light' : 'Aktifkan mode dark'}
+          title={isDark ? 'Mode light' : 'Mode dark'}
+        >
+          <span className="theme-icon" aria-hidden="true">{isDark ? '☀' : '🌙'}</span>
+        </button>
+        <button onClick={handleLogout} className="btn btn-outline" type="button" style={{ padding: '8px 12px' }}>
+          Keluar
+        </button>
       </div>
     </nav>
   );

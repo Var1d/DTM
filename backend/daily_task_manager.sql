@@ -1,6 +1,6 @@
 -- ============================================
 -- DATABASE: Academic Task Manager
--- Platform: MySQL
+-- Platform: MySQL 8+
 -- Project : Tugas Besar - Pengembangan Aplikasi Berbasis Platform
 -- Fokus   : Produktivitas akademik mahasiswa
 -- ============================================
@@ -28,6 +28,7 @@ CREATE TABLE refresh_tokens (
   expires_at  TIMESTAMP     NOT NULL,
   created_at  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
 
+  CONSTRAINT uq_refresh_token UNIQUE (token),
   CONSTRAINT fk_rt_user
     FOREIGN KEY (user_id) REFERENCES users(id)
     ON DELETE CASCADE
@@ -49,7 +50,11 @@ CREATE TABLE courses (
 
   CONSTRAINT fk_course_user
     FOREIGN KEY (user_id) REFERENCES users(id)
-    ON DELETE CASCADE
+    ON DELETE CASCADE,
+
+  CONSTRAINT chk_course_credit CHECK (credit BETWEEN 1 AND 6),
+  CONSTRAINT chk_course_time CHECK (start_time IS NULL OR end_time IS NULL OR start_time < end_time),
+  CONSTRAINT chk_course_color CHECK (color REGEXP '^#[0-9A-Fa-f]{6}$')
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE tasks (
@@ -80,19 +85,74 @@ CREATE TABLE tasks (
 
   CONSTRAINT fk_task_parent
     FOREIGN KEY (parent_id) REFERENCES tasks(id)
-    ON DELETE CASCADE
+    ON DELETE CASCADE,
+
+  CONSTRAINT chk_task_grade_weight CHECK (grade_weight BETWEEN 0 AND 100),
+  CONSTRAINT chk_task_achieved_score CHECK (achieved_score IS NULL OR achieved_score BETWEEN 0 AND 100),
+  CONSTRAINT chk_task_deleted CHECK (is_deleted IN (0, 1)),
+  CONSTRAINT chk_task_no_self_parent CHECK (parent_id IS NULL OR parent_id <> id),
+  CONSTRAINT chk_task_reminder_deadline CHECK (reminder_at IS NULL OR deadline IS NULL OR reminder_at <= deadline)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE INDEX idx_courses_user_id ON courses(user_id);
-CREATE INDEX idx_tasks_user_id   ON tasks(user_id);
+CREATE INDEX idx_courses_user_day_time ON courses(user_id, day, start_time);
+
+CREATE INDEX idx_tasks_user_id ON tasks(user_id);
 CREATE INDEX idx_tasks_course_id ON tasks(course_id);
 CREATE INDEX idx_tasks_parent_id ON tasks(parent_id);
-CREATE INDEX idx_tasks_status    ON tasks(status);
-CREATE INDEX idx_tasks_deadline  ON tasks(deadline);
-CREATE INDEX idx_tasks_deleted   ON tasks(is_deleted);
-CREATE INDEX idx_rt_user_id      ON refresh_tokens(user_id);
+CREATE INDEX idx_tasks_status ON tasks(status);
+CREATE INDEX idx_tasks_deadline ON tasks(deadline);
+CREATE INDEX idx_tasks_deleted ON tasks(is_deleted);
+CREATE INDEX idx_tasks_listing ON tasks(user_id, is_deleted, parent_id, deadline, created_at);
+CREATE INDEX idx_tasks_filter_course_status ON tasks(user_id, course_id, status, is_deleted);
 
--- User dummy. Password dummy ini hanya contoh struktur.
+CREATE INDEX idx_rt_user_id ON refresh_tokens(user_id);
+CREATE INDEX idx_rt_expiry ON refresh_tokens(expires_at);
+
+-- Trigger guard: course_id pada task harus milik user yang sama.
+DELIMITER $$
+CREATE TRIGGER trg_tasks_course_owner_ins
+BEFORE INSERT ON tasks
+FOR EACH ROW
+BEGIN
+  IF NEW.course_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM courses c WHERE c.id = NEW.course_id AND c.user_id = NEW.user_id
+  ) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'course_id tidak valid untuk user ini';
+  END IF;
+
+  IF NEW.parent_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM tasks t WHERE t.id = NEW.parent_id AND t.user_id = NEW.user_id
+  ) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'parent_id tidak valid untuk user ini';
+  END IF;
+END$$
+DELIMITER ;
+
+DELIMITER $$
+CREATE TRIGGER trg_tasks_course_owner_upd
+BEFORE UPDATE ON tasks
+FOR EACH ROW
+BEGIN
+  IF NEW.parent_id IS NOT NULL AND NEW.parent_id = NEW.id THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'parent_id tidak boleh sama dengan id task';
+  END IF;
+
+  IF NEW.course_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM courses c WHERE c.id = NEW.course_id AND c.user_id = NEW.user_id
+  ) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'course_id tidak valid untuk user ini';
+  END IF;
+
+  IF NEW.parent_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM tasks t WHERE t.id = NEW.parent_id AND t.user_id = NEW.user_id
+  ) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'parent_id tidak valid untuk user ini';
+  END IF;
+END$$
+DELIMITER ;
+
+-- Opsional untuk development: seed data. Jangan dipakai di production.
 INSERT INTO users (name, email, password) VALUES
 ('Farid', 'farid@email.com', '$2b$10$examplehashedpassword0987654321fedcba');
 

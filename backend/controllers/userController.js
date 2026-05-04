@@ -2,6 +2,10 @@ const bcrypt = require('bcryptjs');
 const db     = require('../config/db');
 const { success, error } = require('../utils/responseHelper');
 
+const getPublicAvatarPath = (req, filename) => {
+  return `${req.protocol}://${req.get('host')}/uploads/avatars/${filename}`;
+};
+
 // PUT /api/user/profile
 const updateProfile = async (req, res, next) => {
   try {
@@ -15,6 +19,22 @@ const updateProfile = async (req, res, next) => {
       [req.user.id]
     );
     return success(res, rows[0], 'Profil berhasil diperbarui');
+  } catch (err) { next(err); }
+};
+
+// POST /api/user/avatar
+const uploadAvatar = async (req, res, next) => {
+  try {
+    if (!req.file) return error(res, 'File avatar tidak ditemukan', 400);
+
+    const avatarUrl = getPublicAvatarPath(req, req.file.filename);
+    await db.query('UPDATE users SET avatar_url = ? WHERE id = ?', [avatarUrl, req.user.id]);
+
+    const [rows] = await db.query(
+      'SELECT id, name, email, avatar_url FROM users WHERE id = ?',
+      [req.user.id]
+    );
+    return success(res, rows[0], 'Avatar berhasil diperbarui');
   } catch (err) { next(err); }
 };
 
@@ -36,4 +56,4 @@ const updatePassword = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { updateProfile, updatePassword };
+module.exports = { updateProfile, uploadAvatar, updatePassword };

@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors    = require('cors');
+const path    = require('path');
 
 const authRoutes     = require('./routes/authRoutes');
 const taskRoutes     = require('./routes/taskRoutes');
@@ -14,6 +15,7 @@ const PORT = process.env.PORT || 3000;
 // Middleware global
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Routes
 app.use('/api/auth',       authRoutes);

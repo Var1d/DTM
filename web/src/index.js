@@ -1,15 +1,16 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import './styles/theme.css';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<React.StrictMode><App /></React.StrictMode>);
 
-// Register Service Worker — Platform-Specific Feature Web: PWA
+// Register Service Worker - Platform-Specific Feature Web: PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js')
-      .then(reg => console.log('SW registered:', reg.scope))
-      .catch(err => console.log('SW failed:', err));
+      .then((reg) => console.log('SW registered:', reg.scope))
+      .catch((err) => console.log('SW failed:', err));
   });
 }

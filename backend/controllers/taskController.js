@@ -111,13 +111,28 @@ const getAll = async (req, res, next) => {
     query += ' ORDER BY t.deadline IS NULL, t.deadline ASC, t.created_at DESC';
 
     const [tasks] = await db.query(query, params);
+    const taskIds = tasks.map((task) => task.id);
+    const subTaskMap = new Map();
+
+    if (taskIds.length > 0) {
+      const placeholders = taskIds.map(() => '?').join(', ');
+      const [allSubs] = await db.query(
+        `SELECT * FROM tasks
+         WHERE parent_id IN (${placeholders}) AND is_deleted = 0
+         ORDER BY parent_id ASC, created_at ASC`,
+        taskIds
+      );
+
+      for (const sub of allSubs) {
+        const existing = subTaskMap.get(sub.parent_id) || [];
+        existing.push(sub);
+        subTaskMap.set(sub.parent_id, existing);
+      }
+    }
+
     const enriched = [];
     for (const task of tasks) {
-      const [subs] = await db.query(
-        'SELECT * FROM tasks WHERE parent_id = ? AND is_deleted = 0 ORDER BY created_at ASC',
-        [task.id]
-      );
-      const item = enrichTask(task, subs);
+      const item = enrichTask(task, subTaskMap.get(task.id) || []);
       if (priority && item.priority !== priority) continue;
       enriched.push(item);
     }
@@ -269,6 +284,14 @@ const update = async (req, res, next) => {
       }
     }
 
+    if (course_id !== undefined && course_id !== null) {
+      const [course] = await db.query(
+        'SELECT id FROM courses WHERE id = ? AND user_id = ?',
+        [course_id, req.user.id]
+      );
+      if (course.length === 0) return error(res, 'Mata kuliah tidak ditemukan', 404);
+    }
+
     await db.query(
       `UPDATE tasks
        SET title=?, description=?, course_id=?, status=?, deadline=?, reminder_at=?,
@@ -337,6 +360,8 @@ const updateStatus = async (req, res, next) => {
           parentId,
           req.user.id,
         ]);
+      } else {
+        await db.query('UPDATE tasks SET status = "todo" WHERE id = ? AND user_id = ?', [parentId, req.user.id]);
       }
     }
 

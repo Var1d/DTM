@@ -4,7 +4,7 @@ import api from '../utils/api';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user,    setUser]    = useState(null);
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -15,12 +15,16 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
+  const syncUser = (nextUser) => {
+    setUser(nextUser);
+    localStorage.setItem('user', JSON.stringify(nextUser));
+  };
+
   const login = async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
-    localStorage.setItem('access_token',  data.data.access_token);
+    localStorage.setItem('access_token', data.data.access_token);
     localStorage.setItem('refresh_token', data.data.refresh_token);
-    localStorage.setItem('user',          JSON.stringify(data.data.user));
-    setUser(data.data.user);
+    syncUser(data.data.user);
     return data;
   };
 
@@ -37,7 +41,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, syncUser }}>
       {children}
     </AuthContext.Provider>
   );
