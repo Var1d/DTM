@@ -53,8 +53,9 @@ CREATE TABLE courses (
     ON DELETE CASCADE,
 
   CONSTRAINT chk_course_credit CHECK (credit BETWEEN 1 AND 6),
-  CONSTRAINT chk_course_time CHECK (start_time IS NULL OR end_time IS NULL OR start_time < end_time),
-  CONSTRAINT chk_course_color CHECK (color REGEXP '^#[0-9A-Fa-f]{6}$')
+  CONSTRAINT chk_course_time CHECK (start_time IS NULL OR end_time IS NULL OR start_time < end_time)
+  -- NOTE: validasi format hex color (#RRGGBB) dipindah ke trigger karena
+  -- REGEXP di dalam CHECK constraint di-parse MySQL tapi TIDAK dieksekusi (silent ignore).
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE tasks (
@@ -90,7 +91,8 @@ CREATE TABLE tasks (
   CONSTRAINT chk_task_grade_weight CHECK (grade_weight BETWEEN 0 AND 100),
   CONSTRAINT chk_task_achieved_score CHECK (achieved_score IS NULL OR achieved_score BETWEEN 0 AND 100),
   CONSTRAINT chk_task_deleted CHECK (is_deleted IN (0, 1)),
-  CONSTRAINT chk_task_no_self_parent CHECK (parent_id IS NULL OR parent_id <> id),
+  -- chk_task_no_self_parent DIHAPUS: MySQL error #1901 melarang referensi kolom
+  -- AUTO_INCREMENT (id) di dalam CHECK constraint. Guard ini sudah ditangani trigger.
   CONSTRAINT chk_task_reminder_deadline CHECK (reminder_at IS NULL OR deadline IS NULL OR reminder_at <= deadline)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -110,11 +112,39 @@ CREATE INDEX idx_rt_user_id ON refresh_tokens(user_id);
 CREATE INDEX idx_rt_expiry ON refresh_tokens(expires_at);
 
 -- Trigger guard: course_id pada task harus milik user yang sama.
+-- Juga memvalidasi format hex color pada courses (karena REGEXP di CHECK tidak dieksekusi MySQL).
+DELIMITER $$
+CREATE TRIGGER trg_courses_color_ins
+BEFORE INSERT ON courses
+FOR EACH ROW
+BEGIN
+  IF NEW.color IS NOT NULL AND NEW.color NOT REGEXP '^#[0-9A-Fa-f]{6}$' THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Format color tidak valid, gunakan format #RRGGBB';
+  END IF;
+END$$
+DELIMITER ;
+
+DELIMITER $$
+CREATE TRIGGER trg_courses_color_upd
+BEFORE UPDATE ON courses
+FOR EACH ROW
+BEGIN
+  IF NEW.color IS NOT NULL AND NEW.color NOT REGEXP '^#[0-9A-Fa-f]{6}$' THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Format color tidak valid, gunakan format #RRGGBB';
+  END IF;
+END$$
+DELIMITER ;
+
 DELIMITER $$
 CREATE TRIGGER trg_tasks_course_owner_ins
 BEFORE INSERT ON tasks
 FOR EACH ROW
 BEGIN
+  -- [FIX] Guard self-parent ditambahkan di INSERT (sebelumnya hanya ada di UPDATE)
+  IF NEW.parent_id IS NOT NULL AND NEW.parent_id = NEW.id THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'parent_id tidak boleh sama dengan id task';
+  END IF;
+
   IF NEW.course_id IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM courses c WHERE c.id = NEW.course_id AND c.user_id = NEW.user_id
   ) THEN
@@ -154,7 +184,8 @@ DELIMITER ;
 
 -- Opsional untuk development: seed data. Jangan dipakai di production.
 INSERT INTO users (name, email, password) VALUES
-('Farid', 'farid@email.com', '$2b$10$examplehashedpassword0987654321fedcba');
+('Farid', 'farid@email.com', '$2b$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ12345');
+-- ^ Hash di atas adalah PLACEHOLDER 60-char. Ganti dengan hash bcrypt asli sebelum deploy.
 
 INSERT INTO courses (user_id, name, lecturer, room, day, start_time, end_time, credit, color) VALUES
 (1, 'Pengembangan Aplikasi Berbasis Platform', 'Dosen PABP', 'Lab Komputer', 'Senin', '08:00:00', '09:40:00', 3, '#6366f1'),
