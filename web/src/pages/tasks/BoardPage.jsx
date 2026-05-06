@@ -6,6 +6,7 @@ import PriorityBadge from '../../components/task/PriorityBadge';
 import { useCourse } from '../../context/CourseContext';
 import { useTask } from '../../context/TaskContext';
 import { timeAgo } from '../../utils/dateHelper';
+import TaskDetailModal from './TaskDetailModal';
 import TaskFormModal from './TaskFormModal';
 
 const COLUMNS = [
@@ -14,12 +15,13 @@ const COLUMNS = [
   { id: 'done', label: 'Selesai', color: '#4ade80' },
 ];
 
-function DraggableTaskCard({ task, onEdit, onDelete }) {
+function DraggableTaskCard({ task, onEdit, onDelete, onOpen }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.45 : 1 };
+  const subTasks = task.sub_tasks || [];
 
   return (
-    <div ref={setNodeRef} style={style} className="task-card" {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style} className="task-card" onClick={() => onOpen(task)} {...attributes} {...listeners}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
         <p style={{ margin: 0, fontWeight: 700 }}>{task.title}</p>
         <div style={{ display: 'flex', gap: 6 }}>
@@ -36,12 +38,23 @@ function DraggableTaskCard({ task, onEdit, onDelete }) {
       </div>
 
       {task.deadline && <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '8px 0 0' }}>Deadline {timeAgo(task.deadline)}</p>}
+      {subTasks.length > 0 && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: 11, marginBottom: 5 }}>
+            <span>{subTasks.length} subtask</span>
+            <span>{task.progress ?? 0}%</span>
+          </div>
+          <div style={{ height: 5, borderRadius: 999, background: 'var(--bg-soft)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+            <div style={{ width: `${task.progress ?? 0}%`, height: '100%', background: task.course_color || 'var(--primary)' }} />
+          </div>
+        </div>
+      )}
       {task.academic_priority && <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '4px 0 0' }}>Skor {task.academic_priority.score} - {task.academic_priority.label}</p>}
     </div>
   );
 }
 
-function KanbanColumn({ column, tasks, onEdit, onDelete }) {
+function KanbanColumn({ column, tasks, onEdit, onDelete, onOpen }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
 
   return (
@@ -52,7 +65,7 @@ function KanbanColumn({ column, tasks, onEdit, onDelete }) {
         <span style={{ marginLeft: 'auto', color: 'var(--text-muted)' }}>{tasks.length}</span>
       </div>
       <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
-        {tasks.map((task) => <DraggableTaskCard key={task.id} task={task} onEdit={onEdit} onDelete={onDelete} />)}
+        {tasks.map((task) => <DraggableTaskCard key={task.id} task={task} onEdit={onEdit} onDelete={onDelete} onOpen={onOpen} />)}
       </SortableContext>
     </section>
   );
@@ -63,6 +76,7 @@ export default function BoardPage() {
   const { courses, fetchCourses } = useCourse();
   const [showModal, setShowModal] = useState(false);
   const [editTask, setEditTask] = useState(null);
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [search, setSearch] = useState('');
   const [courseId, setCourseId] = useState('');
 
@@ -83,6 +97,7 @@ export default function BoardPage() {
     acc[column.id] = filtered.filter((task) => task.status === column.id);
     return acc;
   }, {});
+  const selectedTask = tasks.find((task) => task.id === selectedTaskId);
 
   const handleDragEnd = ({ active, over }) => {
     if (!over || active.id === over.id) return;
@@ -115,13 +130,33 @@ export default function BoardPage() {
             </div>
           ) : (
             <div className="board-grid">
-              {COLUMNS.map((column) => <KanbanColumn key={column.id} column={column} tasks={grouped[column.id]} onEdit={(task) => { setEditTask(task); setShowModal(true); }} onDelete={deleteTask} />)}
+              {COLUMNS.map((column) => (
+                <KanbanColumn
+                  key={column.id}
+                  column={column}
+                  tasks={grouped[column.id]}
+                  onOpen={(task) => setSelectedTaskId(task.id)}
+                  onEdit={(task) => { setEditTask(task); setShowModal(true); }}
+                  onDelete={deleteTask}
+                />
+              ))}
             </div>
           )}
         </DndContext>
       )}
 
       {showModal && <TaskFormModal task={editTask} onClose={() => { setShowModal(false); setEditTask(null); fetchTasks(); }} />}
+      {selectedTask && (
+        <TaskDetailModal
+          task={selectedTask}
+          onClose={() => setSelectedTaskId(null)}
+          onEdit={(task) => {
+            setSelectedTaskId(null);
+            setEditTask(task);
+            setShowModal(true);
+          }}
+        />
+      )}
     </div>
   );
 }

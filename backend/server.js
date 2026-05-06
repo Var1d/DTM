@@ -7,7 +7,9 @@ const authRoutes     = require('./routes/authRoutes');
 const taskRoutes     = require('./routes/taskRoutes');
 const courseRoutes   = require('./routes/courseRoutes');
 const userRoutes     = require('./routes/userRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 const errorMiddleware = require('./middlewares/errorMiddleware');
+const { ensureNotificationTables, startReminderWorker } = require('./services/pushService');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -22,6 +24,7 @@ app.use('/api/auth',       authRoutes);
 app.use('/api/tasks',      taskRoutes);
 app.use('/api/courses',    courseRoutes);
 app.use('/api/user',       userRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health check
 app.get('/', (req, res) => {
@@ -31,6 +34,14 @@ app.get('/', (req, res) => {
 // Error handler (harus paling bawah)
 app.use(errorMiddleware);
 
-app.listen(PORT, () => {
-  console.log(`Server berjalan di http://localhost:${PORT}`);
-});
+ensureNotificationTables()
+  .then(() => {
+    startReminderWorker();
+    app.listen(PORT, () => {
+      console.log(`Server berjalan di http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('Gagal menyiapkan tabel notifikasi:', err);
+    process.exit(1);
+  });

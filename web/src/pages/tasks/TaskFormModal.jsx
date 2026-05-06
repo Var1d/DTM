@@ -3,6 +3,7 @@ import { useCourse } from '../../context/CourseContext';
 import { useTask } from '../../context/TaskContext';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
+import { toDateTimeLocalValue } from '../../utils/dateHelper';
 
 const TASK_TYPES = [
   ['assignment', 'Tugas'], ['quiz', 'Kuis'], ['mid_exam', 'UTS'], ['final_exam', 'UAS'],
@@ -25,7 +26,7 @@ export default function TaskFormModal({ task, onClose }) {
     grade_weight: task?.grade_weight ?? 0,
     achieved_score: task?.achieved_score ?? '',
     status: task?.status || 'todo',
-    deadline: task?.deadline ? task.deadline.slice(0, 16) : '',
+    deadline: toDateTimeLocalValue(task?.deadline),
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

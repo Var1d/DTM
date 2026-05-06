@@ -2,9 +2,22 @@ import { createContext, useCallback, useContext, useState } from 'react';
 import api from '../utils/api';
 
 const CourseContext = createContext(null);
+const COURSE_CACHE_KEY = 'pio.cached_courses';
+
+const readCachedCourses = () => {
+  try {
+    return JSON.parse(localStorage.getItem(COURSE_CACHE_KEY) || '[]');
+  } catch {
+    return [];
+  }
+};
+
+const saveCachedCourses = (nextCourses) => {
+  localStorage.setItem(COURSE_CACHE_KEY, JSON.stringify(nextCourses));
+};
 
 export const CourseProvider = ({ children }) => {
-  const [courses, setCourses] = useState([]);
+  const [courses, setCourses] = useState(readCachedCourses);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -14,8 +27,15 @@ export const CourseProvider = ({ children }) => {
     try {
       const { data } = await api.get('/courses');
       setCourses(data.data);
+      saveCachedCourses(data.data);
     } catch (e) {
-      setError(e.response?.data?.message || 'Gagal memuat mata kuliah');
+      const cachedCourses = readCachedCourses();
+      if (cachedCourses.length > 0) {
+        setCourses(cachedCourses);
+        setError(null);
+      } else {
+        setError(e.response?.data?.message || 'Gagal memuat mata kuliah');
+      }
     } finally {
       setLoading(false);
     }
@@ -33,7 +53,11 @@ export const CourseProvider = ({ children }) => {
 
   const deleteCourse = async (id) => {
     await api.delete(`/courses/${id}`);
-    setCourses((prev) => prev.filter((course) => course.id !== id));
+    setCourses((prev) => {
+      const nextCourses = prev.filter((course) => course.id !== id);
+      saveCachedCourses(nextCourses);
+      return nextCourses;
+    });
   };
 
   return (

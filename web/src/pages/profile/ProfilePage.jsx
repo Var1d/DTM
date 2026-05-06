@@ -7,6 +7,13 @@ import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import Avatar from '../../components/common/Avatar';
 import { getCroppedImg } from '../../utils/cropImage';
+import {
+  getPushStatus,
+  isPushSupported,
+  sendTestNotification,
+  subscribeToPush,
+  unsubscribeFromPush,
+} from '../../utils/pushNotifications';
 
 export default function ProfilePage() {
   const { user, logout, syncUser } = useAuth();
@@ -16,6 +23,8 @@ export default function ProfilePage() {
   const [newPass, setNewPass] = useState('');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
+  const [pushState, setPushState] = useState({ supported: isPushSupported(), permission: 'default', subscribed: false });
+  const [pushLoading, setPushLoading] = useState(false);
 
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
   const [cropImage, setCropImage] = useState(null);
@@ -29,6 +38,12 @@ export default function ProfilePage() {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
+
+  useEffect(() => {
+    getPushStatus()
+      .then(setPushState)
+      .catch(() => setPushState({ supported: false, permission: 'unsupported', subscribed: false }));
+  }, []);
 
   const saveProfile = async (e) => {
     e.preventDefault();
@@ -89,6 +104,49 @@ export default function ProfilePage() {
     navigate('/login');
   };
 
+  const refreshPushStatus = async () => {
+    const nextState = await getPushStatus();
+    setPushState(nextState);
+  };
+
+  const handleEnablePush = async () => {
+    setPushLoading(true);
+    try {
+      await subscribeToPush();
+      await refreshPushStatus();
+      setMsg('Notifikasi berhasil diaktifkan');
+    } catch (err) {
+      setMsg(err.response?.data?.message || err.message || 'Gagal mengaktifkan notifikasi');
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
+  const handleDisablePush = async () => {
+    setPushLoading(true);
+    try {
+      await unsubscribeFromPush();
+      await refreshPushStatus();
+      setMsg('Notifikasi berhasil dinonaktifkan');
+    } catch (err) {
+      setMsg(err.response?.data?.message || err.message || 'Gagal menonaktifkan notifikasi');
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
+  const handleTestPush = async () => {
+    setPushLoading(true);
+    try {
+      await sendTestNotification();
+      setMsg('Notifikasi test dikirim');
+    } catch (err) {
+      setMsg(err.response?.data?.message || 'Gagal mengirim notifikasi test');
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
   return (
     <div className="page-shell" style={{ maxWidth: 620 }}>
       <h2>Profil Saya</h2>
@@ -116,6 +174,29 @@ export default function ProfilePage() {
       <div className="glass-card" style={{ padding: 20, marginBottom: 12 }}>
         <h3 style={{ marginTop: 0 }}>Ganti Password</h3>
         <form onSubmit={changePassword}><Input label="Password Lama" type="password" value={oldPass} onChange={(e) => setOldPass(e.target.value)} required /><Input label="Password Baru" type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} required /><Button type="submit" variant="outline" loading={saving} style={{ width: '100%' }}>Ganti Password</Button></form>
+      </div>
+
+      <div className="glass-card" style={{ padding: 20, marginBottom: 12 }}>
+        <h3 style={{ marginTop: 0 }}>Notifikasi</h3>
+        <p style={{ color: 'var(--text-muted)', marginTop: 0 }}>
+          {pushState.supported
+            ? pushState.subscribed
+              ? 'Pengingat tugas aktif di browser ini.'
+              : 'Aktifkan untuk menerima pengingat tugas dari PIO.'
+            : 'Browser ini belum mendukung Web Push Notification.'}
+        </p>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {pushState.subscribed ? (
+            <>
+              <Button type="button" variant="outline" loading={pushLoading} onClick={handleTestPush} style={{ flex: 1 }}>Kirim Test</Button>
+              <Button type="button" variant="danger" loading={pushLoading} onClick={handleDisablePush} style={{ flex: 1 }}>Matikan</Button>
+            </>
+          ) : (
+            <Button type="button" loading={pushLoading} disabled={!pushState.supported || pushState.permission === 'denied'} onClick={handleEnablePush} style={{ width: '100%' }}>
+              Aktifkan Notifikasi
+            </Button>
+          )}
+        </div>
       </div>
 
       <Button variant="danger" onClick={handleLogout} style={{ width: '100%' }}>Keluar dari Akun</Button>

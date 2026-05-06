@@ -1,10 +1,12 @@
 const db = require('../config/db');
 const { success, error } = require('../utils/responseHelper');
+const { normalizeDateTimeInput, parseLocalDateTime, toMysqlDateTime } = require('../utils/dateTimeHelper');
 
 const calculateDeadlineScore = (deadline) => {
   if (!deadline) return 5;
   const now = new Date();
-  const due = new Date(deadline);
+  const due = parseLocalDateTime(deadline);
+  if (!due) return 5;
   const diffMs = due - now;
   const diffDays = diffMs / (1000 * 60 * 60 * 24);
 
@@ -18,8 +20,9 @@ const calculateDeadlineScore = (deadline) => {
 const calculateReminder = (deadline, level) => {
   if (!deadline) return null;
   const now = new Date();
-  const due = new Date(deadline);
-  const reminder = new Date(deadline);
+  const due = parseLocalDateTime(deadline);
+  if (!due) return null;
+  const reminder = new Date(due);
 
   if (level === 'critical') reminder.setHours(reminder.getHours() - 1);
   else if (level === 'high') reminder.setHours(reminder.getHours() - 6);
@@ -47,7 +50,8 @@ const calculateAcademicPriority = (task, progress) => {
     Math.round(calculateDeadlineScore(task.deadline) + Math.min(weight, 40) + difficultyScore + progressPenalty)
   );
 
-  if (task.deadline && new Date(task.deadline) < new Date()) {
+  const due = task.deadline ? parseLocalDateTime(task.deadline) : null;
+  if (due && due < new Date()) {
     return { score, level: 'overdue', label: 'Terlambat' };
   }
   if (score >= 80) return { score, level: 'critical', label: 'Prioritas Ujian' };
@@ -215,6 +219,17 @@ const create = async (req, res, next) => {
       if (parent.length === 0) return error(res, 'Parent task tidak ditemukan', 404);
     }
 
+    const nextDeadline = normalizeDateTimeInput(deadline);
+    const taskDraft = {
+      deadline: nextDeadline,
+      status: status || 'todo',
+      difficulty: difficulty || 'medium',
+      grade_weight: parsedGradeWeight,
+    };
+    const automaticPriority = calculateAcademicPriority(taskDraft, null);
+    const automaticReminder = calculateReminder(taskDraft.deadline, automaticPriority.level);
+    const nextReminder = normalizeDateTimeInput(reminder_at) || toMysqlDateTime(automaticReminder);
+
     const [result] = await db.query(
       `INSERT INTO tasks
        (user_id, course_id, parent_id, title, description, task_type, status, difficulty,
@@ -231,8 +246,8 @@ const create = async (req, res, next) => {
         difficulty || 'medium',
         parsedGradeWeight,
         parsedAchievedScore,
-        deadline || null,
-        reminder_at || null,
+        nextDeadline,
+        nextReminder,
       ]
     );
 
@@ -284,6 +299,18 @@ const update = async (req, res, next) => {
       }
     }
 
+    const nextDeadline = deadline !== undefined ? normalizeDateTimeInput(deadline) : current.deadline;
+    const taskDraft = {
+      ...current,
+      deadline: nextDeadline,
+      status: status || current.status,
+      difficulty: difficulty || current.difficulty,
+      grade_weight: parsedGradeWeight,
+    };
+    const automaticPriority = calculateAcademicPriority(taskDraft, null);
+    const automaticReminder = calculateReminder(taskDraft.deadline, automaticPriority.level);
+    const nextReminder = reminder_at !== undefined ? normalizeDateTimeInput(reminder_at) : toMysqlDateTime(automaticReminder);
+
     if (course_id !== undefined && course_id !== null) {
       const [course] = await db.query(
         'SELECT id FROM courses WHERE id = ? AND user_id = ?',
@@ -302,8 +329,8 @@ const update = async (req, res, next) => {
         description !== undefined ? description : current.description,
         course_id !== undefined ? course_id : current.course_id,
         status || current.status,
-        deadline !== undefined ? deadline : current.deadline,
-        reminder_at !== undefined ? reminder_at : current.reminder_at,
+        nextDeadline,
+        nextReminder,
         task_type || current.task_type,
         difficulty || current.difficulty,
         parsedGradeWeight,
