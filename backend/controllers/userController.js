@@ -3,16 +3,16 @@ const db     = require('../config/db');
 const { success, error } = require('../utils/responseHelper');
 
 const getPublicAvatarPath = (req, filename) => {
-  return `${req.protocol}://${req.get('host')}/uploads/avatars/${filename}`;
+  return `/uploads/avatars/${filename}`;
 };
 
 // PUT /api/user/profile
 const updateProfile = async (req, res, next) => {
   try {
-    const { name, avatar_url } = req.body;
+    const { name } = req.body;
     await db.query(
-      'UPDATE users SET name = ?, avatar_url = ? WHERE id = ?',
-      [name, avatar_url || null, req.user.id]
+      'UPDATE users SET name = ? WHERE id = ?',
+      [name, req.user.id]
     );
     const [rows] = await db.query(
       'SELECT id, name, email, avatar_url FROM users WHERE id = ?',

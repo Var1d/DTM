@@ -8,11 +8,23 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem('user');
-    if (stored && localStorage.getItem('access_token')) {
-      setUser(JSON.parse(stored));
-    }
-    setLoading(false);
+    const initAuth = async () => {
+      const stored = localStorage.getItem('user');
+      const token = localStorage.getItem('access_token');
+      
+      if (stored && token) {
+        try {
+          // Ambil data terbaru dari server agar sinkron dengan Mobile
+          const { data } = await api.get('/auth/me');
+          syncUser(data.data);
+        } catch (err) {
+          // Fallback ke local storage jika server tidak bisa dijangkau
+          setUser(JSON.parse(stored));
+        }
+      }
+      setLoading(false);
+    };
+    initAuth();
   }, []);
 
   const syncUser = (nextUser) => {

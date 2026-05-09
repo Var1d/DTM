@@ -85,4 +85,54 @@ class TaskModel {
   bool get isOverdue => priority == 'overdue';
   bool get isCritical => priority == 'critical';
   bool get isDone => status == 'done';
+
+  TaskModel copyWith({
+    int? id,
+    int? userId,
+    int? courseId,
+    int? parentId,
+    String? title,
+    String? description,
+    String? taskType,
+    String? status,
+    String? priority,
+    int? academicScore,
+    String? academicLabel,
+    String? difficulty,
+    double? gradeWeight,
+    double? achievedScore,
+    DateTime? deadline,
+    DateTime? reminderAt,
+    int? progress,
+    String? courseName,
+    String? courseColor,
+    String? lecturer,
+    String? room,
+    List<TaskModel>? subTasks,
+  }) {
+    return TaskModel(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      courseId: courseId ?? this.courseId,
+      parentId: parentId ?? this.parentId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      taskType: taskType ?? this.taskType,
+      status: status ?? this.status,
+      priority: priority ?? this.priority,
+      academicScore: academicScore ?? this.academicScore,
+      academicLabel: academicLabel ?? this.academicLabel,
+      difficulty: difficulty ?? this.difficulty,
+      gradeWeight: gradeWeight ?? this.gradeWeight,
+      achievedScore: achievedScore ?? this.achievedScore,
+      deadline: deadline ?? this.deadline,
+      reminderAt: reminderAt ?? this.reminderAt,
+      progress: progress ?? this.progress,
+      courseName: courseName ?? this.courseName,
+      courseColor: courseColor ?? this.courseColor,
+      lecturer: lecturer ?? this.lecturer,
+      room: room ?? this.room,
+      subTasks: subTasks ?? this.subTasks,
+    );
+  }
 }

@@ -1,36 +1,41 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'package:path/path.dart' as p;
 import '../utils/constants.dart';
 import 'storage_service.dart';
 
+/// ApiService — Layar abstraksi komunikasi antara aplikasi mobile dan backend server.
+/// Menyediakan metode statis untuk operasi CRUD, autentikasi, dan pengelolaan file.
 class ApiService {
   static const String baseUrl = AppConstants.baseUrl;
 
-  // ── Header helper ──────────────────────────────────────────────────────────
-  static Future<Map<String, String>> _headers({bool auth = true}) async {
+  /// Menghasilkan header HTTP standar dengan token otorisasi jika diperlukan.
+  static Map<String, String> _headers({bool auth = true}) {
     final headers = {'Content-Type': 'application/json'};
     if (auth) {
-      final token = await StorageService.getAccessToken();
+      final token = StorageService.getAccessToken();
       if (token != null) headers['Authorization'] = 'Bearer $token';
     }
     return headers;
   }
 
-  // ── Response handler ───────────────────────────────────────────────────────
+  /// Melakukan parsing terhadap response JSON dan menangani error HTTP.
   static Map<String, dynamic> _handle(http.Response res) {
     final body = jsonDecode(res.body);
     if (res.statusCode >= 200 && res.statusCode < 300) return body;
     throw Exception(body['message'] ?? 'Terjadi kesalahan');
   }
 
+  /// Mencoba memperbarui Access Token menggunakan Refresh Token.
   static Future<bool> refreshAccessToken() async {
-    final refreshToken = await StorageService.getRefreshToken();
+    final refreshToken = StorageService.getRefreshToken();
     if (refreshToken == null) return false;
 
     try {
       final res = await http.post(
         Uri.parse('$baseUrl/auth/refresh'),
-        headers: await _headers(auth: false),
+        headers: _headers(auth: false),
         body: jsonEncode({'refresh_token': refreshToken}),
       );
       final body = _handle(res);
@@ -41,12 +46,13 @@ class ApiService {
     }
   }
 
+  /// Wrapper untuk pengiriman request dengan mekanisme auto-retry saat token kedaluwarsa.
   static Future<http.Response> _sendWithRefresh(
     Future<http.Response> Function(Map<String, String> headers) send,
   ) async {
-    var res = await send(await _headers());
+    var res = await send(_headers());
     if (res.statusCode == 401 && await refreshAccessToken()) {
-      res = await send(await _headers());
+      res = await send(_headers());
     }
     return res;
   }
@@ -56,7 +62,7 @@ class ApiService {
       String name, String email, String password) async {
     final res = await http.post(
       Uri.parse('$baseUrl/auth/register'),
-      headers: await _headers(auth: false),
+      headers: _headers(auth: false),
       body: jsonEncode({'name': name, 'email': email, 'password': password}),
     );
     return _handle(res);
@@ -66,20 +72,24 @@ class ApiService {
       String email, String password) async {
     final res = await http.post(
       Uri.parse('$baseUrl/auth/login'),
-      headers: await _headers(auth: false),
+      headers: _headers(auth: false),
       body: jsonEncode({'email': email, 'password': password}),
     );
     return _handle(res);
   }
 
   static Future<void> logout(String refreshToken) async {
-    await _sendWithRefresh(
-      (headers) => http.post(
-        Uri.parse('$baseUrl/auth/logout'),
-        headers: headers,
-        body: jsonEncode({'refresh_token': refreshToken}),
-      ),
-    );
+    try {
+      await _sendWithRefresh(
+        (headers) => http.post(
+          Uri.parse('$baseUrl/auth/logout'),
+          headers: headers,
+          body: jsonEncode({'refresh_token': refreshToken}),
+        ),
+      );
+    } catch (_) {
+      // Silently fail on logout
+    }
   }
 
   static Future<Map<String, dynamic>> getMe() async {
@@ -89,7 +99,8 @@ class ApiService {
     return _handle(res);
   }
 
-  // ══ TASKS ══════════════════════════════════════════════════════════════════
+  // ── Modul Pengelolaan Tugas (Tasks) ──
+  /// Mengambil daftar tugas dengan filter opsional (status, prioritas, matkul, dsb).
   static Future<Map<String, dynamic>> getTasks({
     String? status,
     String? priority,
@@ -161,7 +172,7 @@ class ApiService {
     _handle(res);
   }
 
-  // COURSES
+  // ── Modul Pengelolaan Mata Kuliah (Courses) ──
   static Future<Map<String, dynamic>> getCourses() async {
     final res = await _sendWithRefresh(
       (headers) => http.get(Uri.parse('$baseUrl/courses'), headers: headers),
@@ -201,7 +212,7 @@ class ApiService {
     _handle(res);
   }
 
-  // ══ USER ══════════════════════════════════════════════════════════════════
+  // ── Modul Pengelolaan Profil Pengguna (User) ──
   static Future<Map<String, dynamic>> updateProfile(String name) async {
     final res = await _sendWithRefresh(
       (headers) => http.put(
@@ -222,5 +233,44 @@ class ApiService {
       ),
     );
     _handle(res);
+  }
+
+  /// Mengunggah foto profil pengguna dalam format Multipart.
+  static Future<Map<String, dynamic>> uploadAvatar(String filePath) async {
+    final token = StorageService.getAccessToken();
+    var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/user/avatar'));
+    
+    if (token != null) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+    
+    // Simulate PNG conversion by sending as avatar.png to match web behavior
+    request.files.add(await http.MultipartFile.fromPath(
+      'avatar', 
+      filePath,
+      filename: 'avatar.png',
+      contentType: MediaType('image', 'png'),
+    ));
+    
+    final streamedResponse = await request.send();
+    final res = await http.Response.fromStream(streamedResponse);
+    
+    if (res.statusCode == 401 && await refreshAccessToken()) {
+      // Retry once if token expired
+      final newToken = StorageService.getAccessToken();
+      var retryReq = http.MultipartRequest('POST', Uri.parse('$baseUrl/user/avatar'));
+      if (newToken != null) retryReq.headers['Authorization'] = 'Bearer $newToken';
+      retryReq.files.add(await http.MultipartFile.fromPath(
+        'avatar', 
+        filePath,
+        filename: 'avatar.png',
+        contentType: MediaType('image', 'png'),
+      ));
+      final retryStream = await retryReq.send();
+      final retryRes = await http.Response.fromStream(retryStream);
+      return _handle(retryRes);
+    }
+    
+    return _handle(res);
   }
 }

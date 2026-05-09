@@ -6,6 +6,7 @@ import '../../providers/task_provider.dart';
 import '../../providers/course_provider.dart';
 import '../../widgets/common/custom_button.dart';
 import '../../widgets/common/custom_textfield.dart';
+import '../../utils/app_theme.dart';
 
 class TaskFormScreen extends StatefulWidget {
   final bool isEdit;
@@ -105,7 +106,11 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
 
     if (!mounted) return;
     setState(() => _submitting = false);
-    if (ok) Navigator.pop(context);
+    if (ok) {
+      // Refresh stats matkul agar SKS Terpantau langsung terupdate
+      context.read<CourseProvider>().refreshSilent();
+      Navigator.pop(context);
+    }
   }
 
   @override
@@ -146,7 +151,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 maxLines: 3),
             const SizedBox(height: 16),
             DropdownButtonFormField<int?>(
-              initialValue: _courseId,
+              value: _courseId,
               hint: const Text('Pilih Mata Kuliah'),
               decoration: InputDecoration(
                 labelText: 'Mata Kuliah',
@@ -160,7 +165,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              initialValue: _taskType,
+              value: _taskType,
               decoration: InputDecoration(
                 labelText: 'Jenis Tugas',
                 border:
@@ -183,7 +188,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              initialValue: _difficulty,
+              value: _difficulty,
               decoration: InputDecoration(
                 labelText: 'Tingkat Kesulitan',
                 border:
@@ -239,16 +244,17 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
             const Divider(),
             const SizedBox(height: 8),
             // Status selector
+            // Custom Status selector yang mirip web
             Text('Status', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'todo', label: Text('Todo')),
-                ButtonSegment(value: 'in_progress', label: Text('Progress')),
-                ButtonSegment(value: 'done', label: Text('Selesai')),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _buildStatusButton('todo', 'To Do'),
+                const SizedBox(width: 8),
+                _buildStatusButton('in_progress', 'In Progress'),
+                const SizedBox(width: 8),
+                _buildStatusButton('done', 'Selesai'),
               ],
-              selected: {_status},
-              onSelectionChanged: (v) => setState(() => _status = v.first),
             ),
             const SizedBox(height: 32),
             CustomButton(
@@ -257,6 +263,46 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               isLoading: _submitting,
             ),
           ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusButton(String value, String label) {
+    final isSelected = _status == value;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _status = value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: 44,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: isSelected
+                ? (isDark
+                    ? AppTheme.primaryGradientDark
+                    : AppTheme.primaryGradient)
+                : null,
+            border: isSelected
+                ? null
+                : Border.all(
+                    color: isDark ? Colors.white24 : Colors.black12,
+                    width: 1,
+                  ),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected
+                  ? Colors.white
+                  : (isDark ? Colors.white70 : Colors.black87),
+              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
         ),
       ),
     );

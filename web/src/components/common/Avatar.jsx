@@ -1,10 +1,16 @@
+import { ROOT_URL } from '../../utils/api';
+
 export default function Avatar({ user, size = 56 }) {
   const initial = user?.name?.[0]?.toUpperCase() || 'U';
 
   if (user?.avatar_url) {
+    const avatarUrl = user.avatar_url.startsWith('/') 
+      ? `${ROOT_URL}${user.avatar_url}` 
+      : user.avatar_url;
+
     return (
       <img
-        src={user.avatar_url}
+        src={avatarUrl}
         alt="Avatar"
         style={{
           width: size,

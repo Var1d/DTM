@@ -1,16 +1,29 @@
 import 'package:flutter/material.dart';
+import '../../widgets/common/loading_logo.dart';
 import 'package:provider/provider.dart';
 import '../../models/task_model.dart';
 import '../../providers/task_provider.dart';
+import '../../providers/course_provider.dart';
 import '../../services/api_service.dart';
+import '../../utils/app_theme.dart';
 import '../../utils/date_helper.dart';
+import '../../widgets/common/glass_card.dart';
+import '../../widgets/common/custom_button.dart';
 import '../../widgets/task/priority_badge.dart';
 import '../../widgets/task/subtask_tile.dart';
 import 'task_form_screen.dart';
 
+/// ============================================================
+/// TaskDetailScreen — Layar informasi mendalam untuk setiap tugas.
+/// Menampilkan metadata tugas seperti deadline, bobot nilai,
+/// deskripsi lengkap, serta pengelolaan daftar sub-tugas (subtasks).
+/// ============================================================
 class TaskDetailScreen extends StatefulWidget {
   final int taskId;
-  const TaskDetailScreen({super.key, required this.taskId});
+  final TaskModel? task; // Data awal dari board (opsional)
+
+  const TaskDetailScreen({super.key, required this.taskId, this.task});
+
   @override
   State<TaskDetailScreen> createState() => _TaskDetailScreenState();
 }
@@ -19,283 +32,465 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   TaskModel? _task;
   bool _loading = true;
 
+  /// Inisialisasi data tugas. Menggunakan data awal jika tersedia untuk mempercepat render.
   @override
   void initState() {
     super.initState();
-    _loadTask();
+    // Gunakan data awal jika ada (instan), lalu fetch update di background
+    _task = widget.task;
+    _loading = _task == null;
+    _loadTask(showLoading: _task == null);
   }
 
-  Future<void> _loadTask() async {
-    setState(() => _loading = true);
-    final res = await ApiService.getTask(widget.taskId);
-    setState(() {
-      _task = TaskModel.fromJson(res['data']);
-      _loading = false;
-    });
+  /// Mengambil data tugas terbaru dari server API.
+  Future<void> _loadTask({bool showLoading = true}) async {
+    try {
+      final res = await ApiService.getTask(widget.taskId);
+      if (!mounted) return;
+      setState(() {
+        _task = TaskModel.fromJson(res['data']);
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
   }
 
+  /// Menampilkan form modal untuk penambahan sub-tugas baru.
   Future<void> _showAddSubtaskSheet() async {
-    final titleCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    var difficulty = 'medium';
-    var submitting = false;
-
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) => Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            20,
-            20,
-            MediaQuery.of(ctx).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Tambah Sub-task',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: titleCtrl,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Judul Sub-task',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descCtrl,
-                minLines: 2,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Deskripsi (opsional)',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: difficulty,
-                decoration: const InputDecoration(
-                  labelText: 'Tingkat Kesulitan',
-                  border: OutlineInputBorder(),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'easy', child: Text('Mudah')),
-                  DropdownMenuItem(value: 'medium', child: Text('Sedang')),
-                  DropdownMenuItem(value: 'hard', child: Text('Sulit')),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    setModalState(() => difficulty = value);
-                  }
-                },
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  icon: submitting
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.add_task_rounded),
-                  label: const Text('Tambah Sub-task'),
-                  onPressed: submitting
-                      ? null
-                      : () async {
-                          final title = titleCtrl.text.trim();
-                          if (title.isEmpty) return;
-                          final navigator = Navigator.of(ctx);
-                          final taskProvider = context.read<TaskProvider>();
-                          setModalState(() => submitting = true);
-                          await ApiService.createTask({
-                            'title': title,
-                            'description': descCtrl.text.trim().isEmpty
-                                ? null
-                                : descCtrl.text.trim(),
-                            'parent_id': _task!.id,
-                            'course_id': _task!.courseId,
-                            'task_type': 'other',
-                            'difficulty': difficulty,
-                            'status': 'todo',
-                          });
-                          if (!mounted) return;
-                          navigator.pop();
-                          await _loadTask();
-                          if (mounted) {
-                            taskProvider.fetchTasks();
-                          }
-                        },
-                ),
-              ),
-            ],
-          ),
-        ),
+      builder: (ctx) => _SubtaskFormSheet(
+        parentId: _task!.id,
+        courseId: _task!.courseId,
+        onSuccess: () {
+          _loadTask(showLoading: false);
+          // Fetch background update untuk provider utama
+          context.read<TaskProvider>().fetchTasks();
+        },
       ),
     );
-
-    titleCtrl.dispose();
-    descCtrl.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_loading && _task == null) {
+      return const Scaffold(body: Center(child: LoadingLogo(size: 64)));
     }
     final t = _task!;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = isDark ? AppTheme.primaryDark : AppTheme.primaryLight;
+    final mutedColor =
+        isDark ? AppTheme.textMutedDark : AppTheme.textMutedLight;
+    final borderColor = isDark ? AppTheme.borderDark : AppTheme.borderLight;
+
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          // SliverAppBar sesuai arsitektur yang sudah ada
-          SliverAppBar(
-            expandedHeight: 160,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(t.title, style: const TextStyle(fontSize: 16)),
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Theme.of(context).colorScheme.primary,
-                      Theme.of(context).colorScheme.primaryContainer
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+      appBar: AppBar(
+        title: Text(t.title, style: const TextStyle(fontSize: 16)),
+        actions: [
+          // Tombol Edit
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: () async {
+              await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => TaskFormScreen(isEdit: true, task: t)));
+              _loadTask();
+              // Sinkronisasi provider agar board utama langsung terupdate
+              if (mounted) {
+                context.read<TaskProvider>().fetchTasks();
+                context.read<CourseProvider>().refreshSilent();
+              }
+            },
+          ),
+          // Tombol Hapus
+          IconButton(
+            icon: Icon(Icons.delete_outline,
+                color: isDark ? AppTheme.dangerDark : AppTheme.dangerLight),
+            onPressed: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Hapus Tugas?'),
+                  content: const Text(
+                      'Apakah Anda yakin ingin menghapus tugas ini? Tindakan ini tidak dapat dibatalkan.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Batal'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: Text('Hapus',
+                          style: TextStyle(
+                              color: isDark
+                                  ? AppTheme.dangerDark
+                                  : AppTheme.dangerLight)),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirmed == true && mounted) {
+                final navigator = Navigator.of(context);
+                await context.read<TaskProvider>().deleteTask(t.id);
+                // Refresh stats matkul agar SKS Terpantau sinkron
+                if (context.mounted) {
+                  context.read<CourseProvider>().refreshSilent();
+                }
+                if (mounted) navigator.pop();
+              }
+            },
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Seksi Header: Judul dan Badge Status
+            Text(t.title, style: Theme.of(context).textTheme.headlineMedium),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                if (t.status != 'done') PriorityBadge(priority: t.priority),
+                if (t.courseName != null)
+                  _chip(
+                    t.courseName!,
+                    t.courseColor != null
+                        ? Color(int.parse(t.courseColor!.replaceFirst('#', '0xFF')))
+                        : primary,
+                    Colors.white,
+                  ),
+                _chip(
+                  taskStatusLabel(t.status, t.progress),
+                  taskStatusColor(t.status, t.progress, isDark).withOpacity(0.12),
+                  taskStatusColor(t.status, t.progress, isDark),
+                  border: taskStatusColor(t.status, t.progress, isDark).withOpacity(0.5),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Seksi Grid Informasi Metadata Tugas
+            IntrinsicHeight(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _infoCard(
+                        'Deadline', DateHelper.format(t.deadline), isDark),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _infoCard('Smart Priority',
+                        '${t.academicLabel} (${t.academicScore})', isDark),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _infoCard('Bobot',
+                        '${t.gradeWeight.toStringAsFixed(0)}%', isDark),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Seksi Deskripsi Tugas
+            if (t.description != null) ...[
+              Text('Deskripsi', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 6),
+              Text(t.description!, style: TextStyle(color: mutedColor)),
+              const SizedBox(height: 16),
+            ],
+
+            // Seksi Daftar Sub-tugas dan Indikator Progress
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Subtask', style: Theme.of(context).textTheme.titleMedium),
+                Text('${t.progress ?? 0}%',
+                    style: TextStyle(color: mutedColor)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Bar Indikator Kemajuan (Progress)
+            Container(
+              height: 7,
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.bgSoftDark : AppTheme.bgSoftLight,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: borderColor),
+              ),
+              child: FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: (t.progress ?? 0) / 100,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: isDark
+                        ? AppTheme.primaryGradientDark
+                        : AppTheme.primaryGradient,
+                    borderRadius: BorderRadius.circular(999),
                   ),
                 ),
               ),
             ),
-            actions: [
-              IconButton(
-                  icon: const Icon(Icons.edit_outlined),
-                  onPressed: () async {
-                    await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) =>
-                                TaskFormScreen(isEdit: true, task: t)));
-                    _loadTask();
-                  }),
-              IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                  onPressed: () async {
-                    final navigator = Navigator.of(context);
-                    await context.read<TaskProvider>().deleteTask(t.id);
-                    if (mounted) navigator.pop();
-                  }),
-            ],
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      PriorityBadge(priority: t.priority),
-                      const SizedBox(width: 8),
-                      if (t.courseName != null)
-                        Chip(
-                            label: Text(t.courseName!,
-                                style: const TextStyle(fontSize: 12)),
-                            padding: EdgeInsets.zero,
-                            visualDensity: VisualDensity.compact),
-                    ]),
-                    const SizedBox(height: 16),
-                    _infoRow(Icons.insights_rounded, 'Smart Priority',
-                        '${t.academicLabel} (${t.academicScore})'),
-                    const SizedBox(height: 8),
-                    _infoRow(Icons.percent_rounded, 'Bobot Nilai',
-                        '${t.gradeWeight.toStringAsFixed(0)}%'),
-                    const SizedBox(height: 8),
-                    _infoRow(Icons.fitness_center_rounded, 'Kesulitan',
-                        _difficultyLabel(t.difficulty)),
-                    const SizedBox(height: 16),
-                    if (t.description != null) ...[
-                      Text('Deskripsi',
-                          style: Theme.of(context).textTheme.titleSmall),
-                      const SizedBox(height: 6),
-                      Text(t.description!),
-                      const SizedBox(height: 16),
-                    ],
-                    if (t.deadline != null) ...[
-                      _infoRow(Icons.event, 'Deadline',
-                          DateHelper.format(t.deadline)),
-                      const SizedBox(height: 8),
-                    ],
-                    if (t.reminderAt != null)
-                      _infoRow(Icons.notifications_outlined, 'Reminder',
-                          DateHelper.format(t.reminderAt)),
-                    // Progress sub-task
-                    if (t.subTasks.isNotEmpty) ...[
-                      const SizedBox(height: 20),
-                      Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Sub-task',
-                                style: Theme.of(context).textTheme.titleSmall),
-                            Row(mainAxisSize: MainAxisSize.min, children: [
-                              Text('${t.progress ?? 0}%',
-                                  style: const TextStyle(color: Colors.grey)),
-                              IconButton(
-                                icon: const Icon(Icons.add_task_rounded),
-                                tooltip: 'Tambah Sub-task',
-                                onPressed: _showAddSubtaskSheet,
-                              ),
-                            ]),
-                          ]),
-                      const SizedBox(height: 8),
-                      LinearProgressIndicator(
-                        value: (t.progress ?? 0) / 100,
-                        borderRadius: BorderRadius.circular(4),
-                        minHeight: 6,
-                      ),
-                      const SizedBox(height: 8),
-                      ...t.subTasks.map((s) => SubtaskTile(
-                            subtask: s,
-                            onStatusChanged: (status) async {
-                              await context
-                                  .read<TaskProvider>()
-                                  .updateStatus(s.id, status);
-                              _loadTask();
-                            },
-                          )),
-                    ],
-                    if (t.subTasks.isEmpty) ...[
-                      const SizedBox(height: 20),
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.add_task_rounded),
-                        label: const Text('Tambah Sub-task'),
-                        onPressed: _showAddSubtaskSheet,
-                      ),
-                    ],
-                  ]),
+            const SizedBox(height: 12),
+
+            // Daftar subtask atau pesan kosong
+            if (t.subTasks.isEmpty)
+              Text('Belum ada subtask.', style: TextStyle(color: mutedColor))
+            else
+              ...t.subTasks.map((s) => SubtaskTile(
+                    subtask: s,
+                    onStatusChanged: (status) async {
+                      // 1. Optimistic UI Update: Update lokal langsung biar instan
+                      setState(() {
+                        final idx =
+                            _task!.subTasks.indexWhere((sub) => sub.id == s.id);
+                        if (idx != -1) {
+                          _task!.subTasks[idx] = s.copyWith(status: status);
+                          // Hitung ulang progress secara manual agar progress bar juga instan
+                          final done = _task!.subTasks
+                              .where((st) => st.status == 'done')
+                              .length;
+                          _task = _task!.copyWith(
+                            progress:
+                                ((done / _task!.subTasks.length) * 100).round(),
+                          );
+                        }
+                      });
+
+                      // 2. Sinkronisasi ke server (background, non-blocking)
+                      context.read<TaskProvider>().updateStatus(s.id, status);
+                      context.read<CourseProvider>().refreshSilent();
+                      // Refresh detail view setelah sinkronisasi
+                      Future.delayed(const Duration(seconds: 1), () {
+                        if (mounted) _loadTask(showLoading: false);
+                      });
+                    },
+                    onDelete: () async {
+                      await context.read<TaskProvider>().deleteTask(s.id);
+                      if (context.mounted) {
+                        context.read<CourseProvider>().refreshSilent();
+                      }
+                      _loadTask(showLoading: false);
+                    },
+                  )),
+            const SizedBox(height: 16),
+
+            // Tombol tambah subtask
+            CustomButton(
+              label: 'Tambah Subtask',
+              icon: Icons.add_task_rounded,
+              onPressed: _showAddSubtaskSheet,
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Membangun kartu informasi kecil untuk menampilkan metadata tugas.
+  Widget _infoCard(String label, String value, bool isDark) {
+    final mutedColor =
+        isDark ? AppTheme.textMutedDark : AppTheme.textMutedLight;
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(label,
+                style: TextStyle(
+                    color: mutedColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            Text(value,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  height: 1.2,
+                  color: isDark ? Colors.white : Colors.black,
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Membangun badge/chip untuk kategori atau status tugas.
+  Widget _chip(String label, Color bg, Color textColor, {Color? border}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: border != null ? Border.all(color: border) : null,
+      ),
+      child: Text(label,
+          style: TextStyle(
+              fontSize: 12, color: textColor, fontWeight: FontWeight.w500)),
+    );
+  }
+
+  String taskStatusLabel(String status, int? progress) {
+    if (status == 'done') return 'Selesai';
+    if (status == 'in_progress' || (progress ?? 0) > 0) return 'Sedang Dikerjakan';
+    return 'Belum Dimulai';
+  }
+
+  Color taskStatusColor(String status, int? progress, bool isDark) {
+    if (status == 'done') return Colors.green;
+    if (status == 'in_progress' || (progress ?? 0) > 0) return Colors.blue;
+    return isDark ? AppTheme.textMutedDark : AppTheme.textMutedLight;
+  }
+
+  Widget _buildLabel(BuildContext context, String text) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Text(text,
+        style: TextStyle(
+          fontSize: 14,
+          color: isDark ? AppTheme.textMutedDark : AppTheme.textMutedLight,
+        ));
+  }
+}
+
+/// Widget Form Subtask terpisah untuk menghindari error context leaks
+class _SubtaskFormSheet extends StatefulWidget {
+  final int parentId;
+  final int? courseId;
+  final VoidCallback onSuccess;
+
+  const _SubtaskFormSheet({
+    required this.parentId,
+    this.courseId,
+    required this.onSuccess,
+  });
+
+  @override
+  State<_SubtaskFormSheet> createState() => _SubtaskFormSheetState();
+}
+
+class _SubtaskFormSheetState extends State<_SubtaskFormSheet> {
+  final _titleCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  String _difficulty = 'medium';
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final title = _titleCtrl.text.trim();
+    if (title.isEmpty) return;
+
+    setState(() => _submitting = true);
+    try {
+      await ApiService.createTask({
+        'title': title,
+        'description':
+            _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
+        'parent_id': widget.parentId,
+        'course_id': widget.courseId,
+        'task_type': 'other',
+        'difficulty': _difficulty,
+        'status': 'todo',
+      });
+      if (!mounted) return;
+      widget.onSuccess();
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal: $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final mutedColor =
+        isDark ? AppTheme.textMutedDark : AppTheme.textMutedLight;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Tambah Sub-task',
+              style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 16),
+          Text('Judul Subtask',
+              style: TextStyle(fontSize: 14, color: mutedColor)),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _titleCtrl,
+            autofocus: true,
+            decoration: const InputDecoration(
+                hintText: 'Contoh: Kerjakan bagian analisis'),
+          ),
+          const SizedBox(height: 12),
+          Text('Kesulitan', style: TextStyle(fontSize: 14, color: mutedColor)),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<String>(
+            value: _difficulty,
+            decoration: const InputDecoration(isDense: true),
+            items: const [
+              DropdownMenuItem(value: 'easy', child: Text('Mudah')),
+              DropdownMenuItem(value: 'medium', child: Text('Sedang')),
+              DropdownMenuItem(value: 'hard', child: Text('Sulit')),
+            ],
+            onChanged: (v) => setState(() => _difficulty = v ?? 'medium'),
+          ),
+          const SizedBox(height: 12),
+          Text('Deskripsi Subtask',
+              style: TextStyle(fontSize: 14, color: mutedColor)),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _descCtrl,
+            minLines: 2,
+            maxLines: 3,
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: CustomButton(
+                  label: 'Batal',
+                  outlined: true,
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: CustomButton(
+                  label: 'Tambah Subtask',
+                  isLoading: _submitting,
+                  onPressed: _submit,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
-
-  Widget _infoRow(IconData icon, String label, String value) => Row(children: [
-        Icon(icon, size: 18, color: Colors.grey),
-        const SizedBox(width: 8),
-        Text('$label: ', style: const TextStyle(fontWeight: FontWeight.w600)),
-        Text(value),
-      ]);
-
-  String _difficultyLabel(String value) => switch (value) {
-        'easy' => 'Mudah',
-        'hard' => 'Sulit',
-        _ => 'Sedang',
-      };
 }

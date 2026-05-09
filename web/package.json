@@ -11,7 +11,8 @@
     "react-dom": "^18.2.0",
     "react-easy-crop": "^5.5.7",
     "react-router-dom": "^6.22.0",
-    "react-scripts": "5.0.1"
+    "react-scripts": "5.0.1",
+    "vapid": "^0.7.4"
   },
   "scripts": {
     "start": "react-scripts start",
