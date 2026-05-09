@@ -248,20 +248,32 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             else
               ...t.subTasks.map((s) => SubtaskTile(
                     subtask: s,
-                    onStatusChanged: (status) async {
+                    onStatusChanged: (status) {
                       // 1. Optimistic UI Update: Update lokal langsung biar instan
                       setState(() {
                         final idx =
                             _task!.subTasks.indexWhere((sub) => sub.id == s.id);
                         if (idx != -1) {
                           _task!.subTasks[idx] = s.copyWith(status: status);
-                          // Hitung ulang progress secara manual agar progress bar juga instan
+                          // Hitung ulang progress dan status secara manual
                           final done = _task!.subTasks
                               .where((st) => st.status == 'done')
                               .length;
+                          final newProgress =
+                              ((done / _task!.subTasks.length) * 100).round();
+                          
+                          String newStatus = _task!.status;
+                          if (newProgress == 100) {
+                            newStatus = 'done';
+                          } else if (newProgress > 0) {
+                            newStatus = 'in_progress';
+                          } else {
+                            newStatus = 'todo';
+                          }
+
                           _task = _task!.copyWith(
-                            progress:
-                                ((done / _task!.subTasks.length) * 100).round(),
+                            progress: newProgress,
+                            status: newStatus,
                           );
                         }
                       });
@@ -269,10 +281,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       // 2. Sinkronisasi ke server (background, non-blocking)
                       context.read<TaskProvider>().updateStatus(s.id, status);
                       context.read<CourseProvider>().refreshSilent();
-                      // Refresh detail view setelah sinkronisasi
-                      Future.delayed(const Duration(seconds: 1), () {
-                        if (mounted) _loadTask(showLoading: false);
-                      });
                     },
                     onDelete: () async {
                       await context.read<TaskProvider>().deleteTask(s.id);
