@@ -38,4 +38,32 @@ class CourseModel {
         taskCount: int.tryParse('${json['task_count'] ?? 0}') ?? 0,
         doneCount: int.tryParse('${json['done_count'] ?? 0}') ?? 0,
       );
+
+  CourseModel copyWith({
+    int? id,
+    String? name,
+    String? lecturer,
+    String? room,
+    String? day,
+    String? startTime,
+    String? endTime,
+    int? credit,
+    String? color,
+    int? taskCount,
+    int? doneCount,
+  }) {
+    return CourseModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      lecturer: lecturer ?? this.lecturer,
+      room: room ?? this.room,
+      day: day ?? this.day,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      credit: credit ?? this.credit,
+      color: color ?? this.color,
+      taskCount: taskCount ?? this.taskCount,
+      doneCount: doneCount ?? this.doneCount,
+    );
+  }
 }

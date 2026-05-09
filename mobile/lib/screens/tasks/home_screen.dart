@@ -593,29 +593,31 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.only(bottom: 80),
         cacheExtent: 500, // Pre-render cards offscreen untuk scroll lebih halus
         itemCount: prov.tasks.length,
-        itemBuilder: (_, i) => TaskCard(
-          task: prov.tasks[i],
-          onTap: () async {
-            await Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => TaskDetailScreen(
-                          taskId: prov.tasks[i].id,
-                          task: prov.tasks[i],
-                        )));
-            // Sinkronisasi data setelah kembali dari detail
-            // (mungkin ada edit/hapus/tambah subtask)
-            if (context.mounted) {
-              prov.fetchTasks();
-              context.read<CourseProvider>().refreshSilent();
-            }
-          },
-          onStatusChanged: (status) {
-            prov.updateStatus(prov.tasks[i].id, status);
-            // Refresh stats matkul (SKS Terpantau) setelah status berubah
-            context.read<CourseProvider>().refreshSilent();
-          },
-        ),
+        itemBuilder: (_, i) {
+          final task = prov.tasks[i];
+          return TaskCard(
+            task: task,
+            onTap: () async {
+              await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => TaskDetailScreen(
+                            taskId: task.id,
+                            task: task,
+                          )));
+              if (context.mounted) {
+                prov.fetchTasks();
+                context.read<CourseProvider>().refreshSilent();
+              }
+            },
+            onStatusChanged: (status) {
+              prov.updateStatus(task.id, status);
+              // Optimistic update ke matkul terkait biar statistik instan
+              context.read<CourseProvider>().optimisticUpdateTaskStatus(
+                  task.courseId, status == 'done');
+            },
+          );
+        },
       ),
     );
   }

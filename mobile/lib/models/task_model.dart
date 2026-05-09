@@ -82,9 +82,50 @@ class TaskModel {
       );
 
   // Warna badge priority untuk UI
-  bool get isOverdue => priority == 'overdue';
-  bool get isCritical => priority == 'critical';
+  bool get isOverdue => status != 'done' && deadline != null && DateTime.now().isAfter(deadline!);
+  bool get isCritical => dynamicPriority == 'critical';
   bool get isDone => status == 'done';
+
+  String get dynamicPriority {
+    if (status == 'done') return 'done';
+    if (deadline != null) {
+      final now = DateTime.now();
+      if (now.isAfter(deadline!)) return 'overdue';
+      
+      final diff = deadline!.difference(now);
+      if (diff.inHours < 24) {
+        if (priority == 'critical') return 'critical';
+        if (diff.inHours < 12) return 'critical';
+        if (priority == 'high') return 'high';
+        return 'high';
+      }
+    }
+    return priority == 'done' ? 'none' : (priority ?? 'none');
+  }
+
+  int get dynamicAcademicScore {
+    if (status == 'done') return 0;
+    if (deadline != null) {
+      final now = DateTime.now();
+      if (now.isAfter(deadline!)) return 100;
+      final diff = deadline!.difference(now);
+      if (diff.inHours < 12) return 100; // Selalu prioritas tertinggi jika sangat dekat
+      if (diff.inHours < 24) return (academicScore ?? 0) < 90 ? 90 : academicScore!;
+    }
+    return academicScore ?? 0;
+  }
+
+  String get dynamicAcademicLabel {
+    if (status == 'done') return 'Selesai';
+    if (deadline != null) {
+      final now = DateTime.now();
+      if (now.isAfter(deadline!)) return 'Terlambat';
+      final diff = deadline!.difference(now);
+      if (diff.inHours < 12) return 'Tenggat Waktu Kritis'; // Label eksplisit agar tidak bingung dengan label asli server
+      if (diff.inHours < 24 && (academicScore ?? 0) < 90) return 'Tenggat Waktu Dekat';
+    }
+    return academicLabel ?? 'Tugas Biasa';
+  }
 
   TaskModel copyWith({
     int? id,

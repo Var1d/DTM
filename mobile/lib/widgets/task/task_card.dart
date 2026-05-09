@@ -103,7 +103,7 @@ class TaskCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  PriorityBadge(priority: task.priority),
+                  PriorityBadge(priority: task.dynamicPriority),
                 ],
               ),
               const SizedBox(height: 10),
@@ -190,7 +190,8 @@ class TaskCard extends StatelessWidget {
                 const SizedBox(height: 5),
                 // Progress bar penyelesaian subtask
                 Container(
-                  height: 5,
+                  width: double.infinity,
+                  height: 6,
                   decoration: BoxDecoration(
                     color: isDark ? AppTheme.bgSoftDark : AppTheme.bgSoftLight,
                     borderRadius: BorderRadius.circular(999),
@@ -201,7 +202,9 @@ class TaskCard extends StatelessWidget {
                     widthFactor: (task.progress ?? 0) / 100,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: primary,
+                        gradient: isDark
+                            ? AppTheme.primaryGradientDark
+                            : AppTheme.primaryGradient,
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
@@ -210,11 +213,11 @@ class TaskCard extends StatelessWidget {
               ],
 
               // Skor dan label Smart Priority
-              if (task.academicScore > 0) ...[
+              if (task.dynamicAcademicScore > 0 && !isDone) ...[
                 const SizedBox(height: 6),
                 Text(
-                  'Skor ${task.academicScore} - ${task.academicLabel}',
-                  style: TextStyle(fontSize: 11, color: mutedColor),
+                  'Skor ${task.dynamicAcademicScore} - ${task.dynamicAcademicLabel}',
+                  style: TextStyle(fontSize: 12, color: mutedColor),
                 ),
               ],
             ],

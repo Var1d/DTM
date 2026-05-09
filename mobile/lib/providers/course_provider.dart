@@ -38,6 +38,22 @@ class CourseProvider with ChangeNotifier {
     }
   }
 
+  /// Optimistic UI untuk update jumlah tugas selesai di dalam matkul
+  void optimisticUpdateTaskStatus(int? courseId, bool isDone) {
+    if (courseId == null) return;
+    final idx = _courses.indexWhere((c) => c.id == courseId);
+    if (idx != -1) {
+      final course = _courses[idx];
+      int newDoneCount = course.doneCount + (isDone ? 1 : -1);
+      // Mencegah minus atau melebihi total tugas
+      if (newDoneCount < 0) newDoneCount = 0;
+      if (newDoneCount > course.taskCount) newDoneCount = course.taskCount;
+      
+      _courses[idx] = course.copyWith(doneCount: newDoneCount);
+      notifyListeners();
+    }
+  }
+
   Future<void> fetchCourses() async {
     // 1. Coba muat dari cache dulu (Offline-first, sinkron)
     if (_courses.isEmpty) {

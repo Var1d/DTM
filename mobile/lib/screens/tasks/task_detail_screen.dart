@@ -36,10 +36,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   @override
   void initState() {
     super.initState();
-    // Gunakan data awal jika ada (instan), lalu fetch update di background
+    // Gunakan data awal jika ada (instan), tidak perlu fetch ulang kecuali null
     _task = widget.task;
     _loading = _task == null;
-    _loadTask(showLoading: _task == null);
+    if (_task == null) {
+      _loadTask(showLoading: true);
+    }
   }
 
   /// Mengambil data tugas terbaru dari server API.
@@ -159,7 +161,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               spacing: 8,
               runSpacing: 6,
               children: [
-                if (t.status != 'done') PriorityBadge(priority: t.priority),
+                if (t.status != 'done') PriorityBadge(priority: t.dynamicPriority),
                 if (t.courseName != null)
                   _chip(
                     t.courseName!,
@@ -221,6 +223,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             const SizedBox(height: 8),
             // Bar Indikator Kemajuan (Progress)
             Container(
+              width: double.infinity,
               height: 7,
               decoration: BoxDecoration(
                 color: isDark ? AppTheme.bgSoftDark : AppTheme.bgSoftLight,
@@ -262,7 +265,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                           final newProgress =
                               ((done / _task!.subTasks.length) * 100).round();
                           
-                          String newStatus = _task!.status;
+                          String oldStatus = _task!.status;
+                          String newStatus = oldStatus;
                           if (newProgress == 100) {
                             newStatus = 'done';
                           } else if (newProgress > 0) {
@@ -275,12 +279,24 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                             progress: newProgress,
                             status: newStatus,
                           );
+
+                          // 1.5 Optimistic Update ke list utama & matkul (Tanpa refresh lambat!)
+                          context.read<TaskProvider>().updateTaskLocally(_task!);
+                          if (oldStatus != newStatus && (oldStatus == 'done' || newStatus == 'done')) {
+                            context.read<CourseProvider>().optimisticUpdateTaskStatus(
+                                _task!.courseId, newStatus == 'done');
+                          }
+
+                          // Jika status main task berubah (karena subtask diceklis semua),
+                          // beri tahu server agar tidak desync!
+                          if (oldStatus != newStatus) {
+                            ApiService.updateTaskStatus(_task!.id, newStatus).catchError((_) {});
+                          }
                         }
                       });
 
-                      // 2. Sinkronisasi ke server (background, non-blocking)
+                      // 2. Sinkronisasi subtask ke server (background, non-blocking)
                       context.read<TaskProvider>().updateStatus(s.id, status);
-                      context.read<CourseProvider>().refreshSilent();
                     },
                     onDelete: () async {
                       await context.read<TaskProvider>().deleteTask(s.id);

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/task_model.dart';
 import '../services/api_service.dart';
@@ -32,6 +33,21 @@ class TaskProvider with ChangeNotifier {
   String? _filterDate;
   TaskSortBy _sortBy = TaskSortBy.smartPriority;
   bool _sortAscending = true;
+  Timer? _minuteTimer;
+
+  TaskProvider() {
+    // Jalankan timer untuk me-refresh data (seperti timeAgo dan prioritas dinamis) secara otomatis setiap menit.
+    _minuteTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      _applyFilters();
+      notifyListeners();
+    });
+  }
+
+  @override
+  void dispose() {
+    _minuteTimer?.cancel();
+    super.dispose();
+  }
 
   TaskState get state => _state;
   List<TaskModel> get tasks => _filtered;
@@ -46,10 +62,12 @@ class TaskProvider with ChangeNotifier {
   int get totalCount => _tasks.length;
   int get doneCount => _tasks.where((t) => t.status == 'done').length;
   int get pendingCount => _tasks.where((t) => t.status != 'done').length;
-  int get overdueCount => _tasks.where((t) => t.isOverdue).length;
-  int get criticalCount => _tasks
-      .where((t) => t.priority == 'critical' || t.priority == 'high')
-      .length;
+  int get overdueCount => _tasks.where((t) => t.isOverdue && t.status != 'done').length;
+  int get criticalCount => _tasks.where((t) {
+        if (t.status == 'done') return false;
+        final dp = t.dynamicPriority;
+        return dp == 'critical' || dp == 'high' || dp == 'overdue';
+      }).length;
   int get todayCount => _tasks.where((t) {
         final deadline = t.deadline;
         if (deadline == null) return false;
@@ -136,13 +154,12 @@ class TaskProvider with ChangeNotifier {
       int cmp;
       switch (_sortBy) {
         case TaskSortBy.smartPriority:
-          // Prioritas: critical > high > medium > low > overdue > none/null
-          // Urutan default: paling urgent di atas (descending score)
-          cmp = _priorityWeight(b.priority) - _priorityWeight(a.priority);
-          if (cmp == 0) {
-            // Tie-break: deadline terdekat di atas
-            cmp = _compareDeadlines(a.deadline, b.deadline);
-          }
+          // 1. Sort by dynamic score (descending)
+          cmp = b.dynamicAcademicScore.compareTo(a.dynamicAcademicScore);
+          // 2. Tie break by priority weight
+          if (cmp == 0) cmp = _priorityWeight(b) - _priorityWeight(a);
+          // 3. Tie break by deadline terdekat di atas
+          if (cmp == 0) cmp = _compareDeadlines(a.deadline, b.deadline);
           break;
         case TaskSortBy.deadline:
           cmp = _compareDeadlines(a.deadline, b.deadline);
@@ -159,14 +176,17 @@ class TaskProvider with ChangeNotifier {
   }
 
   /// Bobot numerik untuk prioritas (semakin tinggi = semakin urgent)
-  static int _priorityWeight(String? priority) => switch (priority) {
-    'overdue'  => 5,
-    'critical' => 4,
-    'high'     => 3,
-    'medium'   => 2,
-    'low'      => 1,
-    _          => 0,
-  };
+  static int _priorityWeight(TaskModel t) {
+    if (t.status == 'done') return -1; // Selesai selalu di paling bawah
+    return switch (t.dynamicPriority) {
+      'overdue'  => 5,
+      'critical' => 4,
+      'high'     => 3,
+      'medium'   => 2,
+      'low'      => 1,
+      _          => 0,
+    };
+  }
 
   /// Bandingkan deadline (null dianggap paling akhir)
   static int _compareDeadlines(DateTime? a, DateTime? b) {
@@ -335,35 +355,63 @@ class TaskProvider with ChangeNotifier {
     // 1. Optimistic Update: UI berubah INSTAN tanpa tunggu apapun
     final idx = _tasks.indexWhere((t) => t.id == id);
     if (idx != -1) {
-      _tasks[idx] = _tasks[idx].copyWith(status: status);
+      final oldTask = _tasks[idx];
+      int newProgress = oldTask.progress ?? 0;
+      List<TaskModel> newSubTasks = oldTask.subTasks;
+
+      if (status == 'done') {
+        newProgress = 100;
+        newSubTasks = newSubTasks.map((s) => s.copyWith(status: 'done', progress: 100)).toList();
+      } else if (status == 'todo') {
+        newProgress = 0;
+        newSubTasks = newSubTasks.map((s) => s.copyWith(status: 'todo', progress: 0)).toList();
+      }
+
+      _tasks[idx] = oldTask.copyWith(
+        status: status,
+        progress: newProgress,
+        subTasks: newSubTasks,
+      );
       _applyFilters();
       notifyListeners();
-    }
 
-    // 2. Sinkronisasi ke server di background (fire-and-forget)
-    _syncStatusToServer(id, status);
+      // Panggil background sync untuk main task dan semua subtask-nya
+      _syncStatusToServer(id, status, subTasksToSync: newSubTasks.map((s) => s.id).toList());
+    } else {
+      // Jika task tidak ada di local (misal dipanggil langsung ID-nya)
+      _syncStatusToServer(id, status);
+    }
   }
 
-  /// Proses sinkronisasi status ke server (background, non-blocking)
-  Future<void> _syncStatusToServer(int id, String status) async {
+  Future<void> _syncStatusToServer(int id, String status, {List<int>? subTasksToSync}) async {
     try {
       await ApiService.updateTaskStatus(id, status);
+      
+      // Jika ada subtask, update semua status subtask di server secara async (fire and forget)
+      if (subTasksToSync != null && subTasksToSync.isNotEmpty) {
+        for (var subId in subTasksToSync) {
+          ApiService.updateTaskStatus(subId, status).catchError((_) {});
+        }
+      }
+
       if (status == 'done') {
         NotificationService.cancelReminder(id).catchError((_) {});
       }
       // Update cache lokal
       _cacheCurrentTasks();
-      // Background re-fetch untuk sinkronisasi data server-computed
-      // (priority, academic_score, dll) tanpa blocking UI
-      final res = await ApiService.getTasks();
-      final List data = res['data'];
-      _tasks = data.map((e) => TaskModel.fromJson(e)).toList();
-      StorageService.cacheTasks(data);
-      _applyFilters();
-      notifyListeners();
     } catch (e) {
       // Rollback: fetch ulang dari server jika gagal
       await fetchTasks();
+    }
+  }
+
+  /// Sinkronisasi task spesifik dari TaskDetailScreen ke memori utama secara instan
+  void updateTaskLocally(TaskModel updatedTask) {
+    final idx = _tasks.indexWhere((t) => t.id == updatedTask.id);
+    if (idx != -1) {
+      _tasks[idx] = updatedTask;
+      _applyFilters();
+      notifyListeners();
     }
   }
 

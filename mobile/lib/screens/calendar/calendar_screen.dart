@@ -46,7 +46,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       int cmp;
       switch (prov.sortBy) {
         case TaskSortBy.smartPriority:
-          cmp = _priorityWeight(b.priority) - _priorityWeight(a.priority);
+          cmp = _priorityWeight(b) - _priorityWeight(a);
           if (cmp == 0) cmp = _cmpDeadline(a.deadline, b.deadline);
           break;
         case TaskSortBy.deadline:
@@ -64,10 +64,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return dayTasks;
   }
 
-  static int _priorityWeight(String? p) => switch (p) {
-    'overdue'  => 5, 'critical' => 4, 'high' => 3,
-    'medium'   => 2, 'low'      => 1, _      => 0,
-  };
+  static int _priorityWeight(TaskModel t) {
+    if (t.status == 'done') return -1;
+    return switch (t.priority) {
+      'overdue'  => 5, 'critical' => 4, 'high' => 3,
+      'medium'   => 2, 'low'      => 1, _      => 0,
+    };
+  }
   static int _cmpDeadline(DateTime? a, DateTime? b) {
     if (a == null && b == null) return 0;
     if (a == null) return 1;
@@ -293,7 +296,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           },
                           onStatusChanged: (status) {
                             taskProv.updateStatus(task.id, status);
-                            context.read<CourseProvider>().refreshSilent();
+                            context.read<CourseProvider>().optimisticUpdateTaskStatus(
+                                task.courseId, status == 'done');
                           },
                         );
                       },
