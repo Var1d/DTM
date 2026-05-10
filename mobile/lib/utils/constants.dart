@@ -1,6 +1,5 @@
 class AppConstants {
-  // Ganti dengan IP komputer saat testing di device fisik
-  static const String rootUrl = 'http://10.0.2.2:3000';
+  static const String rootUrl = 'https://pio-server-production.up.railway.app';
   static const String baseUrl = '$rootUrl/api';
 
   // SharedPreferences keys
