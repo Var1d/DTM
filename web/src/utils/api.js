@@ -19,7 +19,11 @@ const getRootUrl = () => {
 export const ROOT_URL = getRootUrl();
 const BASE_URL = `${ROOT_URL}/api`;
 
-const api = axios.create({ baseURL: BASE_URL, headers: { 'Content-Type': 'application/json' } });
+const api = axios.create({
+  baseURL: BASE_URL,
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 15000,
+});
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token');
@@ -35,7 +39,7 @@ api.interceptors.response.use(
       if (refresh) {
         try {
           err.config._retry = true;
-          const { data } = await axios.post(`${BASE_URL}/auth/refresh`, { refresh_token: refresh });
+          const { data } = await axios.post(`${BASE_URL}/auth/refresh`, { refresh_token: refresh }, { timeout: 15000 });
           localStorage.setItem('access_token', data.data.access_token);
           err.config.headers = err.config.headers || {};
           err.config.headers.Authorization = `Bearer ${data.data.access_token}`;

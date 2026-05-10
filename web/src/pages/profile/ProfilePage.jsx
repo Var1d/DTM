@@ -111,12 +111,16 @@ export default function ProfilePage() {
 
   const handleEnablePush = async () => {
     setPushLoading(true);
+    setMsg('Menyiapkan notifikasi...');
     try {
-      await subscribeToPush();
+      await subscribeToPush(setMsg);
       await refreshPushStatus();
       setMsg('Notifikasi berhasil diaktifkan');
     } catch (err) {
-      setMsg(err.response?.data?.message || err.message || 'Gagal mengaktifkan notifikasi');
+      const timeoutMessage = err.code === 'ECONNABORTED'
+        ? 'Server terlalu lama merespons. Coba lagi setelah beberapa detik.'
+        : null;
+      setMsg(err.response?.data?.message || timeoutMessage || err.message || 'Gagal mengaktifkan notifikasi');
     } finally {
       setPushLoading(false);
     }
