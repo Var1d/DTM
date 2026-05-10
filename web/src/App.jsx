@@ -8,6 +8,7 @@ import RegisterPage from './pages/auth/RegisterPage';
 import BoardPage from './pages/tasks/BoardPage';
 import CoursePage from './pages/courses/CoursePage';
 import ProfilePage from './pages/profile/ProfilePage';
+import CalendarPage from './pages/calendar/CalendarPage';
 import { ThemeProvider } from './context/ThemeContext';
 
 function PrivateRoute({ children }) {
@@ -52,6 +53,16 @@ function AnimatedRoutes() {
             <PrivateRoute>
               <MainLayout>
                 <CoursePage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/calendar"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <CalendarPage />
               </MainLayout>
             </PrivateRoute>
           }

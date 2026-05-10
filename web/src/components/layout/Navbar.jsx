@@ -37,6 +37,7 @@ export default function Navbar() {
 
       <div className={`nav-links ${menuOpen ? 'open' : ''}`}>
         <NavLink to="/" end onClick={closeMenu} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>Board</NavLink>
+        <NavLink to="/calendar" onClick={closeMenu} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>Kalender</NavLink>
         <NavLink to="/courses" onClick={closeMenu} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>Mata Kuliah</NavLink>
         <NavLink to="/profile" onClick={closeMenu} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           <Avatar user={user} size={26} />

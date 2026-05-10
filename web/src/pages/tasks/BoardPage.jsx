@@ -23,7 +23,7 @@ function DraggableTaskCard({ task, onEdit, onDelete, onOpen }) {
   return (
     <div ref={setNodeRef} style={style} className="task-card" onClick={() => onOpen(task)} {...attributes} {...listeners}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-        <p style={{ margin: 0, fontWeight: 700 }}>{task.title}</p>
+        <p className="task-title" style={{ margin: 0, fontWeight: 700 }}>{task.title}</p>
         <div style={{ display: 'flex', gap: 6 }}>
           <button className="btn btn-ghost" type="button" style={{ padding: '4px 8px', fontSize: 12 }} onClick={(e) => { e.stopPropagation(); onEdit(task); }}>Edit</button>
           <button className="btn btn-outline" type="button" style={{ padding: '4px 8px', fontSize: 12 }} onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}>Hapus</button>

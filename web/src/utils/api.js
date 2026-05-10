@@ -1,6 +1,22 @@
 import axios from 'axios';
 
-export const ROOT_URL = 'http://localhost:3000';
+const normalizeBaseUrl = (raw) => String(raw || '').trim().replace(/\/+$/, '');
+
+const getRootUrl = () => {
+  const envUrl = normalizeBaseUrl(process.env.REACT_APP_API_URL);
+  if (envUrl) return envUrl;
+
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname, origin } = window.location;
+    const envPort = String(process.env.REACT_APP_API_PORT || '').trim();
+    if (envPort) return `${protocol}//${hostname}:${envPort}`;
+    return origin;
+  }
+
+  return 'http://localhost:3000';
+};
+
+export const ROOT_URL = getRootUrl();
 const BASE_URL = `${ROOT_URL}/api`;
 
 const api = axios.create({ baseURL: BASE_URL, headers: { 'Content-Type': 'application/json' } });
