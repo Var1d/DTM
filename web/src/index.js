@@ -9,8 +9,11 @@ root.render(<React.StrictMode><App /></React.StrictMode>);
 // Register Service Worker - Platform-Specific Feature Web: PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js')
-      .then((reg) => console.log('SW registered:', reg.scope))
+    navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+      .then((reg) => {
+        console.log('SW registered:', reg.scope);
+        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      })
       .catch((err) => console.log('SW failed:', err));
   });
 }

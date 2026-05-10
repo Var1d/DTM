@@ -19,8 +19,27 @@ const cacheAppShell = async () => {
   const cache = await caches.open(CACHE_NAME);
   const buildAssets = await getBuildAssets();
   const urlsToCache = [...new Set([...APP_SHELL, ...buildAssets])];
-  await cache.addAll(urlsToCache);
+  await Promise.all(
+    urlsToCache.map(async (url) => {
+      try {
+        await cache.add(url);
+      } catch {
+        // Keep service worker installation alive even if an optional asset is missing.
+      }
+    })
+  );
 };
+
+const getIndexResponse = async () => {
+  const cachedIndex = await caches.match('/index.html');
+  return cachedIndex || fetch('/index.html');
+};
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 self.addEventListener('install', (event) => {
   event.waitUntil(cacheAppShell());
@@ -38,11 +57,13 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
+          if (!response.ok) return getIndexResponse();
+
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', responseClone));
           return response;
         })
-        .catch(() => caches.match('/index.html'))
+        .catch(() => getIndexResponse())
     );
     return;
   }

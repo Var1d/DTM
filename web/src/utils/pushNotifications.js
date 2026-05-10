@@ -1,5 +1,7 @@
 import api from './api';
 
+const SERVICE_WORKER_TIMEOUT_MS = 10000;
+
 const urlBase64ToUint8Array = (base64String) => {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -17,12 +19,21 @@ export const isPushSupported = () => {
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 };
 
+const waitForServiceWorkerRegistration = async () => {
+  const ready = navigator.serviceWorker.ready;
+  const timeout = new Promise((_, reject) => {
+    window.setTimeout(() => reject(new Error('Service worker belum siap. Coba refresh halaman lalu aktifkan lagi.')), SERVICE_WORKER_TIMEOUT_MS);
+  });
+
+  return Promise.race([ready, timeout]);
+};
+
 export const getPushStatus = async () => {
   if (!isPushSupported()) {
     return { supported: false, permission: 'unsupported', subscribed: false };
   }
 
-  const registration = await navigator.serviceWorker.ready;
+  const registration = await waitForServiceWorkerRegistration();
   const subscription = await registration.pushManager.getSubscription();
 
   return {
@@ -42,8 +53,8 @@ export const subscribeToPush = async () => {
     throw new Error('Izin notifikasi belum diberikan');
   }
 
+  const registration = await waitForServiceWorkerRegistration();
   const { data } = await api.get('/notifications/public-key');
-  const registration = await navigator.serviceWorker.ready;
   let subscription = await registration.pushManager.getSubscription();
 
   if (!subscription) {
@@ -60,7 +71,7 @@ export const subscribeToPush = async () => {
 export const unsubscribeFromPush = async () => {
   if (!isPushSupported()) return;
 
-  const registration = await navigator.serviceWorker.ready;
+  const registration = await waitForServiceWorkerRegistration();
   const subscription = await registration.pushManager.getSubscription();
   if (!subscription) return;
 
